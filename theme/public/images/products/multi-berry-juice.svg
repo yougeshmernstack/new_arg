@@ -1,0 +1,37 @@
+<svg width="900" height="900" viewBox="0 0 900 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="900" rx="64" fill="#FFF2FA"/>
+  <circle cx="210" cy="678" r="170" fill="#F5D6EA"/>
+  <circle cx="704" cy="210" r="170" fill="#EBD5F1"/>
+  <g opacity="0.9">
+    <circle cx="235" cy="578" r="28" fill="#8B3F7A"/>
+    <circle cx="283" cy="612" r="24" fill="#B94E8D"/>
+    <circle cx="638" cy="584" r="30" fill="#74316D"/>
+    <circle cx="682" cy="540" r="22" fill="#C45A9A"/>
+    <path d="M263 584C312 530 358 506 421 507C373 579 324 606 263 584Z" fill="#507A3A"/>
+    <path d="M660 562C607 529 570 492 554 440C622 454 665 491 660 562Z" fill="#507A3A"/>
+  </g>
+  <g filter="url(#shadow)">
+    <path d="M386 195H514V273H386V195Z" fill="#E7D3E4"/>
+    <path d="M403 148H497C510 148 521 159 521 172V204H379V172C379 159 390 148 403 148Z" fill="#8B6B86"/>
+    <rect x="312" y="248" width="276" height="468" rx="66" fill="url(#bottle)"/>
+    <rect x="344" y="318" width="212" height="258" rx="34" fill="#5B2353"/>
+    <path d="M344 318H556V400H344V318Z" fill="#8B3F7A"/>
+    <text x="450" y="384" text-anchor="middle" font-family="Arial, sans-serif" font-size="31" font-weight="700" fill="white">MULTI</text>
+    <text x="450" y="435" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="white">BERRY</text>
+    <text x="450" y="489" text-anchor="middle" font-family="Arial, sans-serif" font-size="29" font-weight="700" fill="#FFE9F8">JUICE</text>
+    <text x="450" y="536" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#F9D8EF">Launching Soon</text>
+    <rect x="362" y="604" width="176" height="42" rx="21" fill="#FFF0FA"/>
+    <text x="450" y="631" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#6E2C66">UPCOMING</text>
+    <path d="M356 268C365 258 378 254 397 254H420C392 351 386 533 398 692H363C337 692 317 672 317 646V315C317 296 331 278 356 268Z" fill="white" fill-opacity="0.42"/>
+  </g>
+  <defs>
+    <filter id="shadow" x="232" y="108" width="436" height="688" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="28" flood-color="#3F1C3A" flood-opacity="0.22"/>
+    </filter>
+    <linearGradient id="bottle" x1="312" y1="248" x2="596" y2="712" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.48" stop-color="#FFF8FE"/>
+      <stop offset="1" stop-color="#E8C4E5"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -1,0 +1,26 @@
+<svg width="900" height="900" viewBox="0 0 900 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="900" rx="64" fill="#FEF3C7"/>
+  <circle cx="690" cy="184" r="150" fill="#A16207" fill-opacity="0.25"/>
+  <circle cx="214" cy="714" r="190" fill="#A16207" fill-opacity="0.18"/>
+  <g filter="url(#shadow)">
+    <path d="M386 195H514V273H386V195Z" fill="#1A1A1A"/>
+    <path d="M403 148H497C510 148 521 159 521 172V204H379V172C379 159 390 148 403 148Z" fill="#333"/>
+    <rect x="312" y="248" width="276" height="468" rx="66" fill="url(#bottle)"/>
+    <rect x="344" y="318" width="212" height="258" rx="34" fill="#78350F"/>
+    <text x="450" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="white">PLANT</text>
+    <text x="450" y="410" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="white">PROTEIN</text>
+    <text x="450" y="460" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#ffffffcc">Chocolate Flavor</text>
+    <text x="450" y="510" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#ffffffaa">AROGYA GREENLIFE</text>
+    <rect x="372" y="604" width="156" height="42" rx="21" fill="#ffffffcc"/>
+    <text x="450" y="631" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#78350F">500 ML</text>
+  </g>
+  <text x="450" y="820" text-anchor="middle" font-family="Georgia, serif" font-size="22" font-weight="700" fill="#78350F">Arogya Greenlife</text>
+  <defs>
+    <filter id="shadow" x="232" y="108" width="436" height="688" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="28" stdDeviation="28" flood-color="#18301F" flood-opacity="0.22"/>
+    </filter>
+    <linearGradient id="bottle" x1="312" y1="248" x2="596" y2="712" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/><stop offset="0.42" stop-color="#F7FFF4"/><stop offset="1" stop-color="#CDEEC8"/>
+    </linearGradient>
+  </defs>
+</svg>

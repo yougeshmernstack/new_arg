@@ -1,0 +1,33 @@
+<svg width="900" height="900" viewBox="0 0 900 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="900" rx="64" fill="#EEF7E8"/>
+  <circle cx="690" cy="184" r="150" fill="#DFF1D6"/>
+  <circle cx="214" cy="714" r="190" fill="#E5F5DC"/>
+  <path d="M222 640C309 549 387 500 476 494C410 602 323 651 222 640Z" fill="#1F8A56"/>
+  <path d="M186 578C283 492 360 459 456 466C383 559 302 599 186 578Z" fill="#2DA76B"/>
+  <path d="M652 641C566 550 488 501 399 495C465 603 552 652 652 641Z" fill="#1F8A56"/>
+  <path d="M688 579C591 493 514 460 418 467C491 560 572 600 688 579Z" fill="#33B978"/>
+  <g filter="url(#shadow)">
+    <path d="M386 195H514V273H386V195Z" fill="#F2E5C7"/>
+    <path d="M403 148H497C510 148 521 159 521 172V204H379V172C379 159 390 148 403 148Z" fill="#D7C29A"/>
+    <rect x="312" y="248" width="276" height="468" rx="66" fill="url(#bottle)"/>
+    <rect x="344" y="318" width="212" height="258" rx="34" fill="#0F6B45"/>
+    <path d="M344 318H556V400H344V318Z" fill="#1E955F"/>
+    <text x="450" y="386" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="white">ALOE VERA</text>
+    <text x="450" y="438" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#E9F8E8">CONCENTRATE</text>
+    <text x="450" y="486" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="white">JUICE</text>
+    <text x="450" y="536" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#D7F3D6">Daily Wellness</text>
+    <rect x="372" y="604" width="156" height="42" rx="21" fill="#F7E9C5"/>
+    <text x="450" y="631" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#0F6B45">1 BOTTLE</text>
+    <path d="M356 268C365 258 378 254 397 254H420C392 351 386 533 398 692H363C337 692 317 672 317 646V315C317 296 331 278 356 268Z" fill="white" fill-opacity="0.44"/>
+  </g>
+  <defs>
+    <filter id="shadow" x="232" y="108" width="436" height="688" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="28" flood-color="#18301F" flood-opacity="0.22"/>
+    </filter>
+    <linearGradient id="bottle" x1="312" y1="248" x2="596" y2="712" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.42" stop-color="#F7FFF4"/>
+      <stop offset="1" stop-color="#CDEEC8"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -1,0 +1,44 @@
+const nodemailer = require('nodemailer');
+const ejs = require('ejs');
+const path = require('path');
+
+class MailerService {
+    constructor() {
+        // Configure the transporter with the provided SMTP details
+        this.transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtpout.secureserver.net', // SMTP server host
+            port: process.env.SMTP_PORT || 465, // SMTP server port
+            secure: true, // true for 465, false for other ports
+            auth: {
+                user: process.env.SMTP_USER || 'support@epicworld.tech', // SMTP user
+                pass: process.env.SMTP_PASS || 'Worlddynamik7056#$', // SMTP password
+            },
+        });
+    }
+
+    async sendMail(to, subject, template, data) {
+        try {
+            // Render the .ejs template with provided data
+            const html = await ejs.renderFile(
+                path.join(__dirname, '../Template/html/', `${template}.ejs`),
+                data
+            );
+
+            const mailOptions = {
+                from: process.env.FROM_EMAIL || 'support@epicworld.tech', // Sender address
+                to, // Recipient address
+                subject, // Subject line
+                html, // Rendered HTML content
+            };
+
+            // Send the email
+            await this.transporter.sendMail(mailOptions);
+            console.log(`Email sent to ${to} successfully.`);
+        } catch (error) {
+            console.error('Error sending mail:', error.message);
+            throw new Error('Failed to send email');
+        }
+    }
+}
+
+module.exports = new MailerService();

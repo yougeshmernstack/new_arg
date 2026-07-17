@@ -1,0 +1,449 @@
+const Transaction = require("../MODALS/transactions");
+const UserData = require("../MODALS/userData");
+const UserWallet = require("../MODALS/userWallets");
+const Wallets = require("../MODALS/wallets");
+
+const { errorLogger } = require("../utils/logger");
+
+
+class TRANSACTION {
+    async insert(transactionData) {
+        try {
+            // Array to store all saved transactions
+            const savedTransactions = [];
+            const tx_count = await Transaction.find().countDocuments()
+            // Iterate over each transaction in transactionData
+            for (let index = 0; index < transactionData.length; index++) {
+                const element = transactionData[index];
+                const { uid, order_Id, source, amount, debit_credit, Status, wallet_type } = element;
+                // Save transaction to the database
+                if (element.amount > 0) {
+                    const orderTransaction = order_Id
+                        ? await Transaction.findOne({ uid, status: 1, order_Id, source }).sort({ tx_Id: -1 }).limit(1)
+                        : null;
+
+                    const sourceTransaction = await Transaction.findOne({ uid, status: 1, source }).sort({ tx_Id: -1 }).limit(1);
+                    const overallTransaction = await Transaction.findOne({ uid, status: 1, wallet_type }).sort({ tx_Id: -1 }).limit(1);
+
+                    const close_ord = orderTransaction?.close_ord || 0;
+                    const close_src = sourceTransaction?.close_src || 0;
+                    const overall_close = overallTransaction?.overall_close || 0;
+                    const transaction = new Transaction({
+                        tx_Id: tx_count + index + 1,
+                        open_ord: close_ord.toFixed(4),
+                        close_ord: (close_ord + (order_Id ? amount : 0)).toFixed(4),
+                        open_src: close_src.toFixed(4),
+                        close_src: (close_src + amount).toFixed(4),
+                        overall_open: overall_close.toFixed(4),
+                        overall_close: (overall_close + ((debit_credit === 'credit') ? amount : -amount)).toFixed(4),
+                        ...element
+                    })
+                    const savedTransaction = await transaction.save();
+                    savedTransactions.push(savedTransaction);
+
+                    // Update wallets for the saved transaction
+                    await this.updateWallet(savedTransaction.tx_Id, Status);
+                }
+            }
+
+            // Return all saved transactions
+            return savedTransactions;
+        } catch (error) {
+            errorLogger(error)
+            // Handle error
+            console.error('Error saving transactions:', error);
+            throw error;
+        }
+    }
+
+    async update(query, data) {
+        try {
+            const updated = await Transaction.updateMany(query, data, { new: true });
+            const updatedDocuments = await Transaction.find(query);
+            for (let index = 0; index < updatedDocuments.length; index++) {
+                const { tx_Id } = updatedDocuments[index];
+                const close_wallet = await this.updateWallet(tx_Id, 2)
+            }
+            // console.log('==================',updatedDocuments)
+            return updatedDocuments;
+        } catch (error) {
+            errorLogger(error)
+            console.log(error)
+        }
+    }
+    async updateWallet(tx_Id, status) {
+        const { uid, wallet_type: slug, amount, source, debit_credit } = await Transaction.findOne({ tx_Id, status: 0 })
+        if (!uid || !slug || !amount || !debit_credit) {
+            return;
+        }
+        try {
+            const { wallets } = await UserWallet.findOne({ uid, 'wallets.slug': slug }, { 'wallets.$': 1 });
+            const sourceWallets = await UserWallet.findOne({ uid, 'wallets.slug': source }, { 'wallets.$': 1 });
+            if (!wallets) {
+                // console.log("!wallets || wallets[0].value",)
+                return;
+            }
+            let newValue;
+            let newValueSrc;
+            if (debit_credit == 'credit') {
+                newValue = (Number(wallets[0].value) + Number(amount))
+                newValueSrc = (Number(sourceWallets?.wallets[0].value) + Number(amount))
+            } else {
+                newValue = (Number(wallets[0].value) - Number(amount))
+                newValueSrc = (Number(sourceWallets?.wallets[0].value) - Number(amount))
+            }
+            const updatedUserWallet = await UserWallet.findOneAndUpdate(
+                { uid, 'wallets.slug': slug }, // Find the document with matching uid and 'main_wallet' slug
+                { $set: { 'wallets.$.value': newValue } }, // Update the value of the main_wallet
+                { new: true } // Return the updated document
+            );
+            console.log('wallet source', sourceWallets)
+            if (sourceWallets) {
+                const updatedSrcWallet = await UserWallet.findOneAndUpdate(
+                    { uid, 'wallets.slug': source }, // Find the document with matching uid and 'main_wallet' slug
+                    { $set: { 'wallets.$.value': newValueSrc } }, // Update the value of the main_wallet
+                    { new: true } // Return the updated document
+                );
+            }
+
+
+            await Transaction.findOneAndUpdate(
+                { tx_Id },
+                {
+                    status
+                }
+            );
+            //    const close_wallet = await this.updateOpenClose(tx_Id);
+            return;
+        } catch (error) {
+            errorLogger(error)
+            console.error('Error updating main wallet:', error);
+            throw error;
+        }
+
+    }
+    async updateOpenClose(tx_Id) {
+        try {
+            const { uid, order_Id, source, amount, debit_credit } = await Transaction.findOne({ tx_Id });
+            const orderTransaction = order_Id
+                ? await Transaction.findOne({ uid, status: 1, order_Id, source }).sort({ updatedAt: -1 }).limit(1)
+                : null;
+
+            const sourceTransaction = await Transaction.findOne({ uid, status: 1, source }).sort({ updatedAt: -1 }).limit(1);
+            const overallTransaction = await Transaction.findOne({ uid, status: 1 }).sort({ updatedAt: -1 }).limit(1);
+
+            const close_ord = orderTransaction?.close_ord || 0;
+            const close_src = sourceTransaction?.close_src || 0;
+            const overall_close = overallTransaction?.overall_close || 0;
+            // console.log('open close',overallTransaction)
+            const updatedTras = await Transaction.findOneAndUpdate(
+                { tx_Id },
+                {
+                    open_ord: close_ord,
+                    close_ord: close_ord + (order_Id ? amount : 0),
+                    open_src: close_src,
+                    close_src: close_src + amount,
+                    overall_open: overall_close,
+                    overall_close: overall_close + ((debit_credit === 'credit') ? amount : -amount)
+                }, { new: true }
+            );
+            return updatedTras.overall_close;
+        } catch (error) {
+            errorLogger(error)
+            console.log(error)
+        }
+    }
+    async getTransactions(req, res) {
+        try {
+            const { uid, role } = req.user; // Assuming user information is attached to req.user
+            const { page = 1, limit = 10, search, startDate, endDate, ...filters } = req.query;
+
+            const query = {};
+
+            // Restrict to user's own transactions if not admin
+            if (!isNaN(uid)) {
+                query.uid = parseInt(uid); // Ensure uid is a number
+            } else {
+                query.uid = uid; // Assume uid is a string
+            }
+
+            // Apply additional filters
+            for (const key in filters) {
+                if (!isNaN(filters[key])) {
+                    query[key] = parseInt(filters[key]);
+                } else if (filters[key]) {
+                    query[key] = (filters[key]); // Handle other filters
+                }
+            }
+
+            // Date range filtering
+            if (startDate || endDate) {
+                query.time = {};
+                if (startDate) {
+                    query.time.$gte = new Date(new Date(startDate).setHours(0, 0, 0, 0));
+                }
+                if (endDate) {
+                    query.time.$lt = new Date(new Date(endDate).setHours(23, 59, 59, 999));
+                }
+            }
+
+            // If search term is provided, find matching users
+            if (search) {
+                const userSearchRegex = new RegExp(search, 'i');
+                const matchingUsers = await UserData.find({
+                    $or: [
+                        { username: userSearchRegex },
+                        { name: userSearchRegex }
+                    ]
+                }, 'uid');
+                const matchingUserIds = matchingUsers.map(user => user.uid);
+
+               if (role === 'admin' ||  role !== "manager") {
+                    // For admin, filter by matching user IDs
+                    query.uid = { $in: matchingUserIds };
+                } else {
+                    // For regular users, ensure search only includes their own transactions
+                    query.uid = {
+                        $in: matchingUserIds,
+                        $eq: uid
+                    };
+                }
+            }
+
+            // Find transactions
+            const transactions = await Transaction.find(query)
+                .skip((page - 1) * limit)
+                .limit(parseInt(limit))
+                .sort({ createdAt: -1 });
+
+            const totalCount = await Transaction.countDocuments(query);
+
+            // Calculate sum of debit and credit transactions
+            const debitSum = await Transaction.aggregate([
+                { $match: { ...query, debit_credit: 'debit' } },
+                { $group: { _id: null, total: { $sum: '$amount' } } }
+            ]);
+
+            const creditSum = await Transaction.aggregate([
+                { $match: { ...query, debit_credit: 'credit' } },
+                { $group: { _id: null, total: { $sum: '$amount' } } }
+            ]);
+
+            let transactionData = transactions;
+
+            // If role is admin, include username and name
+
+            const userIds = transactions
+                .flatMap(tx => [tx.uid, tx.to_from])
+                .filter(id => !isNaN(Number(id))); // Keep only numeric values
+
+            const users = await UserData.find({ uid: { $in: userIds } }, 'uid username name');
+            const userMap = users.reduce((acc, user) => {
+                acc[user.uid] = user;
+                return acc;
+            }, {});
+            transactionData = transactions.map(tx => ({
+                ...tx.toObject(),
+                username: userMap[tx.uid]?.username,
+                from: userMap[tx.to_from]?.username,
+                name: userMap[tx.uid]?.name
+            }));
+
+            res.status(200).json({
+                success: true,
+                data: transactionData,
+                totalRecords: totalCount,
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(totalCount / limit),
+                debitSum: debitSum[0]?.total || 0,
+                creditSum: creditSum[0]?.total || 0,
+                ...filters
+            });
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
+    async get_Transactions_sum_by_income(req, res) {
+        try {
+            const { uid, role } = req.user; // Assuming user information is attached to req.user
+            const { page = 1, limit = 10, search, startDate, endDate, ...filters } = req.query;
+    
+            const matchQuery = {};
+    
+            // Restrict to user's own transactions if not admin
+            if (role !== 'admin') {
+                if (!isNaN(uid)) {
+                    matchQuery.uid = parseInt(uid); // Ensure uid is a number
+                } else {
+                    matchQuery.uid = uid; // Assume uid is a string
+                }
+            }
+    
+            // Apply additional filters
+            for (const key in filters) {
+                if (!isNaN(filters[key])) {
+                    matchQuery[key] = parseInt(filters[key]);
+                } else if (filters[key]) {
+                    matchQuery[key] = new RegExp(filters[key], 'i'); // Handle other filters
+                }
+            }
+    
+            // Date range filtering
+            if (startDate || endDate) {
+                matchQuery.time = {};
+                if (startDate) {
+                    matchQuery.time.$gte = new Date(new Date(startDate).setHours(0, 0, 0, 0));
+                }
+                if (endDate) {
+                    matchQuery.time.$lt = new Date(new Date(endDate).setHours(23, 59, 59, 999));
+                }
+            }
+    
+            // Fetch wallet with status=1 and wallet_type='income'
+            const wallet = await Wallet.findOne({ status: 1, wallet_type: 'income' });
+            if (wallet) {
+                matchQuery.source = wallet.slug; // Match source with the wallet's slug
+            } else {
+                return res.status(400).json({ success: false, message: "No matching wallet found." });
+            }
+    
+            // If search term is provided, find matching users
+            if (search) {
+                const userSearchRegex = new RegExp(search, 'i');
+                const matchingUsers = await UserData.find({
+                    $or: [
+                        { user_name: userSearchRegex },
+                        { name: userSearchRegex }
+                    ]
+                }, 'uid');
+                const matchingUserIds = matchingUsers.map(user => user.uid);
+    
+                 if (role === 'admin' ||  role !== "manager") {
+                    // For admin, filter by matching user IDs
+                    matchQuery.uid = { $in: matchingUserIds };
+                } else {
+                    // For regular users, ensure search only includes their own transactions
+                    matchQuery.uid = {
+                        $in: matchingUserIds,
+                        $eq: uid
+                    };
+                }
+            }
+    
+            // Aggregation pipeline to group by source and sum amounts
+            const transactions = await Transaction.aggregate([
+                { $match: matchQuery },
+                {
+                    $group: {
+                        _id: '$source', // Group by source
+                        totalAmount: { $sum: '$amount' }, // Sum of amount for each source
+                        transactionCount: { $sum: 1 } // Count number of transactions per source
+                    }
+                },
+                { $skip: (page - 1) * limit }, // Pagination: skip records
+                { $limit: parseInt(limit) }, // Limit the number of results per page
+                { $sort: { totalAmount: -1 } } // Sort by total amount in descending order
+            ]);
+    
+            // Count total distinct sources
+            const totalSourcesCount = await Transaction.aggregate([
+                { $match: matchQuery },
+                { $group: { _id: '$source' } },
+                { $count: 'total' }
+            ]);
+    
+            // Send the response with the data
+            res.status(200).json({
+                success: true,
+                data: transactions,
+                totalSources: totalSourcesCount[0]?.total || 0,
+                currentPage: parseInt(page),
+                totalPages: Math.ceil((totalSourcesCount[0]?.total || 0) / limit)
+            });
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    }
+    
+
+
+    // async getIncomeTransactionSum(req, res) {
+    //     try {
+    //         // Define the required slugs
+    //         const requiredSlugs = ['direct_income', 'reward_income', 'royality_income'];
+    
+    //         // Fetch wallets with wallet_type='income' and status=1, and get the slugs
+    //         const wallets = await Wallets.find({
+    //             wallet_type: 'income',
+    //             status: 1,
+    //             slug: { $in: requiredSlugs }
+    //         }, 'slug');
+    
+    //         const walletSlugs = wallets.map(wallet => wallet.slug);
+    
+    //         // Fetch transactions with source matching the slugs and status=1
+    //         const transactions = await Transaction.find({
+    //             source: { $in: walletSlugs },
+    //             status: 1
+    //         });
+    
+    //         // Calculate the sum of amounts
+    //         const totalSum = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+    
+    //         res.status(200).json({
+    //             success: true,
+    //             totalSum
+    //         });
+    //     } catch (error) {
+    //         console.log(error);
+    //         res.status(500).json({ success: false, message: error.message });
+    //     }
+    // }
+
+    async getIncomeTransactionSum(req, res) {
+        try {
+            // Define the required slugs including the new ones
+            const requiredSlugs = [
+                'direct_income', 
+                'reward_income', 
+                'royality_income',
+                'roi_income',
+                'roi_level_income'
+            ];
+    
+            // Fetch wallets with wallet_type='income' and status=1, and get the slugs
+            const wallets = await Wallets.find({
+                wallet_type: 'income',
+                status: 1,
+                slug: { $in: requiredSlugs }
+            }, 'slug');
+    
+            const walletSlugs = wallets.map(wallet => wallet.slug);
+    
+            // Fetch transactions with source matching the slugs and status=1
+            const transactions = await Transaction.find({
+                source: { $in: walletSlugs },
+                status: 1
+            });
+    
+            // Calculate the sum of amounts
+            const totalSum = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+    
+            res.status(200).json({
+                success: true,
+                totalSum
+            });
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    }
+    
+    
+
+}
+const transaction = new TRANSACTION()
+module.exports = transaction;

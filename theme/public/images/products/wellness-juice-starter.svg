@@ -1,0 +1,16 @@
+<svg width="900" height="700" viewBox="0 0 900 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="700" rx="48" fill="#EEF7E8"/>
+  <rect x="80" y="120" width="160" height="380" rx="40" fill="url(#b1)" stroke="#1F8A56" stroke-width="4"/>
+  <rect x="100" y="200" width="120" height="180" rx="20" fill="#1F8A56"/>
+  <rect x="260" y="120" width="160" height="380" rx="40" fill="url(#b2)" stroke="#8B1E2D" stroke-width="4"/>
+  <rect x="280" y="200" width="120" height="180" rx="20" fill="#8B1E2D"/>
+  <rect x="440" y="120" width="160" height="380" rx="40" fill="url(#b3)" stroke="#1F8A56" stroke-width="4"/>
+  <rect x="460" y="200" width="120" height="180" rx="20" fill="#1F8A56"/>
+  <text x="450" y="580" text-anchor="middle" font-family="Georgia, serif" font-size="28" font-weight="700" fill="#1F8A56">Wellness Juice Starter</text>
+  <text x="450" y="620" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#667366">3 Cold-Pressed Juices</text>
+  <defs>
+    <linearGradient id="b1" x1="80" y1="120" x2="240" y2="500"><stop stop-color="#fff"/><stop offset="1" stop-color="#f0f0f0"/></linearGradient>
+    <linearGradient id="b2" x1="260" y1="120" x2="420" y2="500"><stop stop-color="#fff"/><stop offset="1" stop-color="#f0f0f0"/></linearGradient>
+    <linearGradient id="b3" x1="440" y1="120" x2="600" y2="500"><stop stop-color="#fff"/><stop offset="1" stop-color="#f0f0f0"/></linearGradient>
+  </defs>
+</svg>

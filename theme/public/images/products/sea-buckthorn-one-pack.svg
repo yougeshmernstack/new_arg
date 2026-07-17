@@ -1,0 +1,27 @@
+<svg width="1000" height="760" viewBox="0 0 1000 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1000" height="760" rx="58" fill="#FFF3DC"/>
+  <circle cx="230" cy="160" r="170" fill="#FFE2AA"/>
+  <circle cx="780" cy="612" r="170" fill="#F5C36A"/>
+  <circle cx="292" cy="564" r="34" fill="#E98318"/>
+  <circle cx="676" cy="206" r="30" fill="#E98318"/>
+  <path d="M302 542C359 471 418 440 501 442C448 532 381 570 302 542Z" fill="#6D8E2F"/>
+  <g filter="url(#shadow)">
+    <rect x="382" y="190" width="236" height="430" rx="62" fill="url(#bottle)"/>
+    <rect x="458" y="106" width="84" height="100" rx="24" fill="#B98236"/>
+    <rect x="416" y="284" width="168" height="224" rx="30" fill="#A85F08"/>
+    <text x="500" y="350" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="white">SEA</text>
+    <text x="500" y="395" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="white">BUCKTHORN</text>
+    <text x="500" y="450" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#FFF6DC">JUICE</text>
+  </g>
+  <rect x="346" y="626" width="308" height="56" rx="28" fill="#A85F08"/>
+  <text x="500" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="white">1 BOTTLE PACKAGE</text>
+  <defs>
+    <filter id="shadow" x="322" y="72" width="356" height="608" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="28" flood-color="#5B3408" flood-opacity="0.24"/>
+    </filter>
+    <linearGradient id="bottle" x1="382" y1="190" x2="630" y2="620" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F4C264"/>
+    </linearGradient>
+  </defs>
+</svg>
