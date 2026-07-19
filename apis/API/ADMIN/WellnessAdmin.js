@@ -1,14 +1,21 @@
 const jwt = require('jsonwebtoken');
-const UserData = require('../../MODALS/userData');
 const Franchise = require('../../MODALS/Franchise');
 const Distributor = require('../../MODALS/Distributor');
+const ThemeUser = require('../../MODALS/ThemeUser');
 const Package = require('../../MODALS/Package');
 const Product = require('../../MODALS/Product');
 const CommerceOrder = require('../../MODALS/CommerceOrder');
 const AuditService = require('../../SERVICES/AuditService');
+const { LOW_STOCK_THRESHOLD } = require('./ProductAdmin');
 const { errorLogger } = require('../../utils/logger');
 const { loginSuccess } = require('../../utils/successMessages');
 const { INTERNAL_SERVER_ERROR, FORBIDDEN, INVALID_USERNAME } = require('../../utils/errorMessages');
+
+const PANEL_MODELS = {
+    franchise: Franchise,
+    distributor: Distributor,
+    theme: ThemeUser
+};
 
 class WELLNESS_ADMIN {
     async loginAsUser(req, res) {
@@ -22,13 +29,11 @@ class WELLNESS_ADMIN {
                 return res.status(400).json({ code: 400, message: 'target_role must be franchise, distributor or theme.' });
             }
 
+            const Model = PANEL_MODELS[target_role];
             const query = uid ? { uid: Number(uid) } : { username };
-            const user = await UserData.findOne(query);
+            const user = await Model.findOne(query);
             if (!user) {
                 return res.status(400).json({ ...INVALID_USERNAME });
-            }
-            if (!user.roles || !user.roles.includes(target_role)) {
-                return res.status(400).json({ code: 400, message: `User does not have role: ${target_role}` });
             }
 
             const payload = {
@@ -39,18 +44,21 @@ class WELLNESS_ADMIN {
             };
 
             let franchise = null;
-            if (target_role === 'franchise') {
-                franchise = await Franchise.findOne({ uid: user.uid });
-                if (franchise) payload.franchiseId = franchise.franchiseId;
-            }
             let distributor = null;
+            if (target_role === 'franchise') {
+                franchise = user;
+                payload.franchiseId = user.franchiseId;
+            }
             if (target_role === 'distributor') {
-                distributor = await Distributor.findOne({ uid: user.uid });
-                if (distributor) payload.distributorId = distributor.distributorId;
+                distributor = user;
+                payload.distributorId = user.distributorId;
+            }
+            if (target_role === 'theme') {
+                payload.themeUserId = user.themeUserId;
             }
 
             const token = jwt.sign(payload, process.env.JWT_KEY);
-            await UserData.updateOne({ uid: user.uid }, { $set: { lastActivity: new Date() } });
+            await Model.updateOne({ uid: user.uid }, { $set: { lastActivity: new Date() } });
 
             await AuditService.log({
                 actor_uid: req.user.uid,
@@ -64,12 +72,15 @@ class WELLNESS_ADMIN {
                 meta: { username: user.username, target_role }
             });
 
+            const safeUser = user.toObject();
+            delete safeUser.password;
+
             return res.status(200).json({
                 ...loginSuccess,
                 token,
-                user,
-                franchise,
-                distributor,
+                user: safeUser,
+                franchise: franchise ? (({ password, ...rest }) => rest)(franchise.toObject()) : null,
+                distributor: distributor ? (({ password, ...rest }) => rest)(distributor.toObject()) : null,
                 impersonated: true,
                 target_role
             });
@@ -81,20 +92,45 @@ class WELLNESS_ADMIN {
 
     async wellnessDashboard(req, res) {
         try {
+            const threshold = Number(req.query.low_stock_threshold) || LOW_STOCK_THRESHOLD;
+
             const [
                 franchiseCount,
                 distributorCount,
                 themeUserCount,
                 packageCount,
                 productCount,
-                orderCount
+                orderCount,
+                lowStockCount,
+                outOfStockCount,
+                pendingOrders,
+                deliveredOrders,
+                revenueAgg,
+                lowStockProducts,
+                outOfStockProducts
             ] = await Promise.all([
                 Franchise.countDocuments({ status: { $ne: 'disabled' } }),
                 Distributor.countDocuments({ status: { $ne: 'disabled' } }),
-                UserData.countDocuments({ roles: 'theme' }),
+                ThemeUser.countDocuments({ status: 1 }),
                 Package.countDocuments({ status: { $ne: 'disabled' } }),
                 Product.countDocuments({ status: 'enabled' }),
-                CommerceOrder.countDocuments()
+                CommerceOrder.countDocuments(),
+                Product.countDocuments({ status: 'enabled', stock: { $gt: 0, $lte: threshold } }),
+                Product.countDocuments({ status: 'enabled', stock: { $lte: 0 } }),
+                CommerceOrder.countDocuments({ order_status: 'pending' }),
+                CommerceOrder.countDocuments({ order_status: 'delivered' }),
+                CommerceOrder.aggregate([
+                    { $match: { order_status: { $nin: ['cancelled', 'refunded'] } } },
+                    { $group: { _id: null, revenue: { $sum: '$grand_total' } } }
+                ]),
+                Product.find({ status: 'enabled', stock: { $gt: 0, $lte: threshold } })
+                    .sort({ stock: 1 })
+                    .limit(10)
+                    .select('productId product_name sku stock is_hidden'),
+                Product.find({ status: 'enabled', stock: { $lte: 0 } })
+                    .sort({ updated_at: -1 })
+                    .limit(10)
+                    .select('productId product_name sku stock is_hidden')
             ]);
 
             return res.status(200).json({
@@ -106,7 +142,15 @@ class WELLNESS_ADMIN {
                     theme_users: themeUserCount,
                     packages: packageCount,
                     products: productCount,
-                    orders: orderCount
+                    orders: orderCount,
+                    low_stock: lowStockCount,
+                    out_of_stock: outOfStockCount,
+                    pending_orders: pendingOrders,
+                    delivered_orders: deliveredOrders,
+                    revenue: revenueAgg[0]?.revenue || 0,
+                    low_stock_products: lowStockProducts,
+                    out_of_stock_products: outOfStockProducts,
+                    low_stock_threshold: threshold
                 }
             });
         } catch (error) {

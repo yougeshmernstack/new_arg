@@ -4,8 +4,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { storage } from '../../utils/storage';
 
 export default function Profile() {
-  const { setProfile } = useAuth();
+  const { setProfile, user, profile } = useAuth();
   const [form, setForm] = useState({ name: '', email: '', mobile: '' });
+  const [username, setUsername] = useState(user?.username || profile?.username || '');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -23,6 +24,7 @@ export default function Profile() {
             email: distributor.email || '',
             mobile: distributor.mobile || '',
           });
+          setUsername(distributor.username || '');
           setProfile(distributor);
           storage.setProfile(distributor);
         }
@@ -65,6 +67,10 @@ export default function Profile() {
       {error ? <div className="alert error">{error}</div> : null}
       {message ? <div className="alert success">{message}</div> : null}
       <form className="form-grid" onSubmit={onSubmit}>
+        <label>
+          Username / ID
+          <input name="username" value={username} readOnly disabled />
+        </label>
         {['name', 'email', 'mobile'].map((key) => (
           <label key={key}>
             {key}

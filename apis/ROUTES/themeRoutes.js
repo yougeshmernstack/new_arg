@@ -3,6 +3,7 @@ var bodyParser = require("body-parser");
 const cors = require("cors");
 const authenticator = require("../utils/authuser");
 const { ThemeAuth } = require("../API/THEME/Auth");
+const Storefront = require("../API/COMMERCE/Storefront");
 
 var theme = express.Router();
 var jsonParser = bodyParser.json();
@@ -20,6 +21,16 @@ theme.post('/login', ThemeAuth.login);
 theme.get('/get-dashboard', ThemeAuth.getDashboard);
 theme.get('/get-profile', ThemeAuth.getProfile);
 theme.post('/update-profile', ThemeAuth.updateProfile);
-theme.get('/get-notifications', ThemeAuth.getNotifications);
+theme.post('/change-password', ThemeAuth.changePassword);
+
+theme.get('/get-products', Storefront.listProducts);
+theme.get('/get-product', Storefront.getProduct);
+theme.get('/get-cart', Storefront.getCart);
+theme.post('/add-to-cart', Storefront.addToCart);
+theme.post('/update-cart-item', Storefront.updateCartItem);
+theme.post('/remove-cart-item', Storefront.removeCartItem);
+theme.post('/checkout', Storefront.checkout);
+theme.get('/get-orders', Storefront.myOrders);
+theme.get('/get-order', Storefront.getOrder);
 
 module.exports = theme;

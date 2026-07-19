@@ -1,4 +1,18 @@
 const mongoose = require('mongoose');
+const { getNextOrderNumber } = require('../utils/sequence');
+
+const ORDER_STATUSES = [
+    'pending',
+    'confirmed',
+    'packed',
+    'shipped',
+    'in_transit',
+    'out_for_delivery',
+    'delivered',
+    'cancelled',
+    'returned',
+    'refunded'
+];
 
 const orderItemSchema = new mongoose.Schema({
     productId: { type: Number, required: true },
@@ -16,16 +30,34 @@ const timelineSchema = new mongoose.Schema({
     status: { type: String, required: true },
     remark: { type: String, default: '' },
     updated_by: { type: Number, default: null },
+    updated_by_role: { type: String, default: '' },
+    updated_by_name: { type: String, default: '' },
     updated_at: { type: Date, default: Date.now }
+}, { _id: false });
+
+const shippingSchema = new mongoose.Schema({
+    courier_name: { type: String, default: '' },
+    tracking_number: { type: String, default: '' },
+    shipping_partner: { type: String, default: '' },
+    dispatch_date: { type: Date, default: null },
+    estimated_delivery: { type: Date, default: null },
+    delivered_date: { type: Date, default: null }
 }, { _id: false });
 
 const commerceOrderSchema = new mongoose.Schema({
     orderId: { type: Number, unique: true },
     order_number: { type: String, unique: true },
-    // franchise_purchase | distributor_purchase | theme_purchase
+    invoice_number: { type: String, unique: true, sparse: true },
+    idempotency_key: { type: String, unique: true, sparse: true },
+    // franchise_purchase | distributor_purchase | theme_purchase | distributor_package_purchase
     order_type: {
         type: String,
-        enum: ['franchise_purchase', 'distributor_purchase', 'theme_purchase'],
+        enum: [
+            'franchise_purchase',
+            'distributor_purchase',
+            'theme_purchase',
+            'distributor_package_purchase'
+        ],
         required: true
     },
     buyer_uid: { type: Number, required: true },
@@ -36,6 +68,10 @@ const commerceOrderSchema = new mongoose.Schema({
     },
     franchiseId: { type: Number, default: null },
     distributorId: { type: Number, default: null },
+    packageId: { type: Number, default: null },
+    package_name: { type: String, default: '' },
+    bv: { type: Number, default: 0 },
+    pv: { type: Number, default: 0 },
     items: { type: [orderItemSchema], default: [] },
     subtotal: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
@@ -46,26 +82,10 @@ const commerceOrderSchema = new mongoose.Schema({
         enum: ['pending', 'received', 'failed', 'refunded'],
         default: 'pending'
     },
-    // Order Placed → … → Completed + failure statuses
     order_status: {
         type: String,
-        enum: [
-            'order_placed',
-            'payment_received',
-            'confirmed',
-            'packed',
-            'ready_to_dispatch',
-            'dispatched',
-            'in_transit',
-            'out_for_delivery',
-            'delivered',
-            'completed',
-            'cancelled',
-            'returned',
-            'refunded',
-            'out_of_stock'
-        ],
-        default: 'order_placed'
+        enum: ORDER_STATUSES,
+        default: 'pending'
     },
     dispatch_status: {
         type: String,
@@ -73,6 +93,7 @@ const commerceOrderSchema = new mongoose.Schema({
         default: 'pending'
     },
     timeline: { type: [timelineSchema], default: [] },
+    shipping: { type: shippingSchema, default: () => ({}) },
     shipping_address: {
         name: { type: String, default: '' },
         mobile: { type: String, default: '' },
@@ -83,6 +104,8 @@ const commerceOrderSchema = new mongoose.Schema({
         pincode: { type: String, default: '' },
         country: { type: String, default: 'India' }
     },
+    // Set true once franchise Inventory has been credited on admin confirm
+    franchise_stock_credited: { type: Boolean, default: false },
     created_date: { type: Date, default: Date.now }
 }, {
     timestamps: true
@@ -92,6 +115,8 @@ commerceOrderSchema.index({ buyer_uid: 1 });
 commerceOrderSchema.index({ order_status: 1 });
 commerceOrderSchema.index({ order_type: 1 });
 commerceOrderSchema.index({ created_date: -1 });
+commerceOrderSchema.index({ invoice_number: 1 }, { unique: true, sparse: true });
+commerceOrderSchema.index({ idempotency_key: 1 }, { unique: true, sparse: true });
 
 commerceOrderSchema.pre('save', async function (next) {
     try {
@@ -100,11 +125,11 @@ commerceOrderSchema.pre('save', async function (next) {
             this.orderId = latest ? latest.orderId + 1 : 10001;
         }
         if (!this.order_number) {
-            this.order_number = `ORD-${this.orderId}`;
+            this.order_number = await getNextOrderNumber();
         }
         if (!this.timeline || this.timeline.length === 0) {
             this.timeline = [{
-                status: this.order_status || 'order_placed',
+                status: this.order_status || 'pending',
                 remark: 'Order created',
                 updated_at: new Date()
             }];
@@ -117,3 +142,4 @@ commerceOrderSchema.pre('save', async function (next) {
 
 const CommerceOrder = mongoose.model('CommerceOrder', commerceOrderSchema);
 module.exports = CommerceOrder;
+module.exports.ORDER_STATUSES = ORDER_STATUSES;

@@ -1,0 +1,54 @@
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const paymentsDir = path.join(__dirname, '..', 'uploads', 'payments');
+if (!fs.existsSync(paymentsDir)) {
+  fs.mkdirSync(paymentsDir, { recursive: true });
+}
+
+const getExtensionFromMimeType = (mimetype) => {
+  const mimeToExt = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+  };
+  return mimeToExt[mimetype] || '';
+};
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, paymentsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const extension = getExtensionFromMimeType(file.mimetype) || path.extname(file.originalname);
+    cb(null, `${uniqueSuffix}${extension}`);
+  },
+});
+
+const allowedMimeTypes = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+];
+
+const fileFilter = (req, file, cb) => {
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only JPEG, PNG, GIF, WEBP images are allowed!'), false);
+  }
+};
+
+const paymentUpload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+module.exports = paymentUpload;

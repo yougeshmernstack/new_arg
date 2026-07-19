@@ -6,7 +6,7 @@ const CryptoJS = require('crypto-js');
 const { MISSING_AUTH_TOKEN, TOKEN_EXPIRED, FORBIDDEN } = require('./errorMessages');
 const { errorLogger } = require('./logger');
 const { PermissionRoute } = require('../MODALS/Permission');
-const UserData = require('../MODALS/userData');
+const { findPanelByUid, getPanelRoles, touchLastActivity } = require('./panelIdentity');
 const merchantKey = process.env.MERCHANT_KEY;
 class Authenticator {
     constructor() {
@@ -111,20 +111,22 @@ async authenticateToken(req, res, next, route_For) {
             return res.status(401).json({ message: "Invalid or expired token" });
         }
 
-        // Fetch user data from the database to get roles
-        const user = await UserData.findOne({ uid: decoded.uid });
-        if (!user) {
-            console.log("User not found in database for UID:", decoded.uid);
+        // Resolve identity from the panel-specific table (not a shared UserData roles table)
+        const panelUser = await findPanelByUid(route_For, decoded.uid);
+        if (!panelUser) {
+            console.log("User not found in panel table:", route_For, "UID:", decoded.uid);
             return res.status(403).json({ message: "User not found" });
         }
+
+        const userRoles = getPanelRoles(route_For, panelUser);
 
         // Check for inactivity-based token expiration (for all roles)
         const INACTIVITY_TIMEOUT_MINUTES = parseInt(process.env.INACTIVITY_TIMEOUT_MINUTES) || 5;
         const INACTIVITY_TIMEOUT = INACTIVITY_TIMEOUT_MINUTES * 60 * 1000; // Convert minutes to milliseconds
         const now = new Date();
         
-        if (user.lastActivity) {
-            const timeSinceLastActivity = now - new Date(user.lastActivity);
+        if (panelUser.lastActivity) {
+            const timeSinceLastActivity = now - new Date(panelUser.lastActivity);
             if (timeSinceLastActivity > INACTIVITY_TIMEOUT) {
                 return res.status(401).json({ 
                     message: "Session expired due to inactivity. Please login again.",
@@ -132,21 +134,22 @@ async authenticateToken(req, res, next, route_For) {
                 });
             }
         }
-        
-        // Update lastActivity timestamp
-        await UserData.updateOne({ uid: decoded.uid }, { $set: { lastActivity: now } });
+
+        // Update lastActivity on the correct panel table
+        await touchLastActivity(route_For, decoded.uid);
 
         req.user = decoded; // Attach user info to the request
+        req.panelUser = panelUser;
 
         // Check if user's roles match any of the required roles
-        if (user.roles.some(role => permission.roles.includes(role))) {
+        if (userRoles.some(role => permission.roles.includes(role))) {
             return next(); // Allow access if roles match
         }
 
         return res.status(403).json({
             success: false,
             message: "No Permission",
-            details: `User Roles: ${user.roles.join(', ')}, Required Roles: ${permission.roles.join(', ')}`
+            details: `User Roles: ${userRoles.join(', ')}, Required Roles: ${permission.roles.join(', ')}`
         });
 
     } catch (error) {

@@ -8,18 +8,22 @@ const initial = {
   name: '',
   email: '',
   mobile: '',
-  username: '',
   password: '',
   sponsor_Id: '',
+  placement: 'left',
 };
 
 const fields = [
   { name: 'name', label: 'Full name', placeholder: 'Your full name', type: 'text', autoComplete: 'name' },
   { name: 'email', label: 'Email', placeholder: 'name@example.com', type: 'email', autoComplete: 'email' },
   { name: 'mobile', label: 'Mobile', placeholder: 'Mobile number', type: 'tel', autoComplete: 'tel' },
-  { name: 'username', label: 'Username', placeholder: 'Choose username', type: 'text', autoComplete: 'username' },
   { name: 'password', label: 'Password', placeholder: 'Create password', type: 'password', autoComplete: 'new-password' },
-  { name: 'sponsor_Id', label: 'Sponsor ID', placeholder: 'Sponsor ID', type: 'text', autoComplete: 'off' },
+  { name: 'sponsor_Id', label: 'Sponsor username', placeholder: 'Enter sponsor username', type: 'text', autoComplete: 'off' },
+];
+
+const SIDE_OPTIONS = [
+  { value: 'left', label: 'Left' },
+  { value: 'right', label: 'Right' },
 ];
 
 export default function Register() {
@@ -27,8 +31,9 @@ export default function Register() {
   const navigate = useNavigate();
   const [form, setForm] = useState(initial);
   const [error, setError] = useState('');
+  const [generatedUsername, setGeneratedUsername] = useState('');
 
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  if (isAuthenticated && !generatedUsername) return <Navigate to="/" replace />;
 
   const onChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
@@ -36,12 +41,44 @@ export default function Register() {
     e.preventDefault();
     setError('');
     try {
-      await register(form);
+      const data = await register(form);
+      const username = data?.distributor?.username || data?.user?.username || '';
+      if (username) {
+        setGeneratedUsername(username);
+        return;
+      }
       navigate('/', { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     }
   };
+
+  if (generatedUsername) {
+    return (
+      <div className="auth-page">
+        <div className="auth-wrap">
+          <div className="auth-panel auth-success-panel">
+            <div className="auth-logo-wrap">
+              <BrandLogo className="brand-logo auth-logo" />
+            </div>
+            <div className="auth-heading">
+              <h1>Account created</h1>
+              <p>Your distributor account is ready.</p>
+            </div>
+            <div className="auth-username-card">
+              <span>Your username</span>
+              <strong>{generatedUsername}</strong>
+              <p>Save this username — you will need it to sign in.</p>
+            </div>
+            <button className="btn primary auth-submit" type="button" onClick={() => navigate('/', { replace: true })}>
+              Continue to dashboard
+            </button>
+          </div>
+          <p className="auth-bottom">Natural · Pure · Healthy · Sustainable</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page">
@@ -55,6 +92,7 @@ export default function Register() {
             <p>Register as an Arogya Green Life distributor</p>
           </div>
           {error ? <div className="alert error">{error}</div> : null}
+          <p className="auth-note">Username will be generated automatically after registration.</p>
           <div className="register-fields">
             {fields.map((field) => (
               <label key={field.name} className={`register-field field-${field.name}`}>
@@ -70,6 +108,24 @@ export default function Register() {
                 />
               </label>
             ))}
+            <fieldset className="register-field field-placement">
+              <legend>Binary placement</legend>
+              <p className="placement-hint">
+                Choose Left or Right. Placement under your sponsor follows the binary spillover rule automatically.
+              </p>
+              <div className="placement-options">
+                {SIDE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`placement-option${form.placement === opt.value ? ' is-selected' : ''}`}
+                    onClick={() => setForm((p) => ({ ...p, placement: opt.value }))}
+                  >
+                    <span className="placement-label">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
           </div>
           <button className="btn primary auth-submit" type="submit" disabled={loading}>
             {loading ? 'Creating account...' : 'Create account'}

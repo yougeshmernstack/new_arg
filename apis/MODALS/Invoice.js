@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { getNextInvoiceNumber } = require('../utils/sequence');
 
 const invoiceItemSchema = new mongoose.Schema({
     productId: { type: Number, required: true },
@@ -65,6 +66,7 @@ const invoiceSchema = new mongoose.Schema({
 invoiceSchema.index({ customer_uid: 1 });
 invoiceSchema.index({ orderId: 1 });
 invoiceSchema.index({ created_date: -1 });
+invoiceSchema.index({ invoice_number: 1 }, { unique: true });
 
 invoiceSchema.pre('save', async function (next) {
     try {
@@ -73,7 +75,7 @@ invoiceSchema.pre('save', async function (next) {
             this.invoiceId = latest ? latest.invoiceId + 1 : 50001;
         }
         if (!this.invoice_number) {
-            this.invoice_number = `INV-${this.invoiceId}`;
+            this.invoice_number = await getNextInvoiceNumber();
         }
         next();
     } catch (error) {

@@ -23,7 +23,7 @@ const activitySchema = new mongoose.Schema({
         }
     },
     status: { type: Number, default: 1 },
-    allowed_roles: [{ type: String, enum: ['admin', 'user', 'manager'] }],
+    allowed_roles: [{ type: String, enum: ['admin', 'user', 'manager', 'distributor', 'franchise', 'theme'] }],
     act_id: { type: Number, unique: true, required: true }
 });
 
@@ -92,8 +92,8 @@ const act = [
             }
             // You can add more wallets here, but the sum of the percentages for each wallet must equal 100%.
         ],
-        status: 0,
-        allowed_roles: ['user'],
+        status: 1,
+        allowed_roles: ['distributor', 'admin'],
         act_id: 4
     },
     {
@@ -257,13 +257,100 @@ const act = [
         status: 0,
         allowed_roles: ['user'],
         act_id: 14
-    }, 
+    },
+    {
+        name: 'package_purchase',
+        view: 'Package Purchase',
+        description: 'Debit fund wallet for distributor package purchase',
+        type: 'expenses',
+        debit_credit: 'debit',
+        use_wallet: [
+            {
+                wallet_name: 'fund_wallet',
+                percentage: 100
+            }
+        ],
+        status: 1,
+        allowed_roles: ['distributor'],
+        act_id: 15
+    },
+    {
+        name: 'direct_income',
+        view: 'Direct Income',
+        description: 'Direct sponsor income on package purchase (BV %)',
+        type: 'income',
+        debit_credit: 'credit',
+        use_wallet: [
+            {
+                wallet_name: 'main_wallet',
+                percentage: 100
+            }
+        ],
+        status: 1,
+        allowed_roles: ['distributor'],
+        act_id: 16
+    },
 ]
+async function ensureActivity(def) {
+    const existing = await Activity.findOne({ name: def.name });
+    if (existing) {
+        existing.status = def.status;
+        existing.debit_credit = def.debit_credit;
+        existing.type = def.type;
+        existing.view = def.view;
+        existing.description = def.description;
+        existing.use_wallet = def.use_wallet;
+        existing.allowed_roles = def.allowed_roles;
+        await existing.save();
+        return;
+    }
+    const max = await Activity.findOne().sort({ act_id: -1 }).select('act_id');
+    const act_id = def.act_id || ((max?.act_id || 0) + 1);
+    await Activity.create({ ...def, act_id });
+}
+
 async function saveActivity() {
     try {
         const ttl_activity = await Activity.find().count();
         if (ttl_activity == 0) {
             await Activity.insertMany(act)
+        } else {
+            // Keep add_fund active for distributor fund deposits
+            await ensureActivity({
+                name: 'add_fund',
+                view: 'add_fund',
+                description: 'Payment Activity',
+                type: 'p2p',
+                debit_credit: 'credit',
+                use_wallet: [{ wallet_name: 'fund_wallet', percentage: 100 }],
+                status: 1,
+                allowed_roles: ['distributor', 'admin'],
+                act_id: 4
+            });
+            // Debit fund wallet on package purchase
+            await ensureActivity({
+                name: 'package_purchase',
+                view: 'Package Purchase',
+                description: 'Debit fund wallet for distributor package purchase',
+                type: 'expenses',
+                debit_credit: 'debit',
+                use_wallet: [{ wallet_name: 'fund_wallet', percentage: 100 }],
+                status: 1,
+                allowed_roles: ['distributor'],
+                act_id: 15
+            });
+            // Credit direct sponsor income (BV %) on package purchase
+            await ensureActivity({
+                name: 'direct_income',
+                view: 'Direct Income',
+                description: 'Direct sponsor income on package purchase (BV %)',
+                type: 'income',
+                debit_credit: 'credit',
+                use_wallet: [{ wallet_name: 'main_wallet', percentage: 100 }],
+                status: 1,
+                allowed_roles: ['distributor'],
+                act_id: 16
+            });
         }
     } catch (error) {
         errorLogger(error)

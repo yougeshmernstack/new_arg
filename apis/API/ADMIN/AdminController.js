@@ -1,101 +1,60 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const Admin = require('../../MODALS/Admin');
+const AdminData = require('../../MODALS/AdminData');
+const AdminWallet = require('../../MODALS/AdminWallet');
 const { loginSuccess, registrationSuccess, REQUEST_SUCCESS } = require('../../utils/successMessages');
-const { INTERNAL_SERVER_ERROR, INVALID_CREDENTIALS, FORBIDDEN, INVALID_USERNAME } = require('../../utils/errorMessages');
+const { INTERNAL_SERVER_ERROR, INVALID_CREDENTIALS, FORBIDDEN, INVALID_USERNAME, USERNAME_ALREADY_EXISTS } = require('../../utils/errorMessages');
 const { errorLogger } = require('../../utils/logger');
-const UserData = require('../../MODALS/userData');
+const { nextPanelUid } = require('../../utils/panelIdentity');
+const { ensurePanelWallet } = require('../../utils/panelWallet');
 const planSettings = require('../../SERVICES/planService');
-const PlansInfo = require('../../MODALS/Plan');
-const Order  = require('../../MODALS/Orders')
-const Transaction  = require('../../MODALS/transactions');
-const { Power } = require('../../MODALS/Power')
-const crypto = require("crypto"); 
-const Orders = require('../../MODALS/Orders');
-const Team = require('../../SERVICES/UpdateTeam');
-const LevelIncome = require('../../SERVICES/LevelIncome');
 const form_validator = require('../../utils/form-validators');
 
 
 
 class ADMIN {
-    // async login(req, res) {
-    //     const { username, password } = req.body;
-    //     // console.log(req.body)
-    //     try {
-    //         const admin = await UserData.findOne({ username });
-    //         // console.log(admin)
-    //         if (!admin || !(admin.roles && admin.roles.includes('admin'))) {
-
-
-    //             return res.status(401).json({ ...INVALID_CREDENTIALS });
-    //         }
-
-    //         const isMatch = await bcrypt.compare(password, admin.password);
-    //         if (!isMatch) {
-    //             // console.log('here', "==========", isMatch)
-    //             return res.status(401).json({ ...INVALID_CREDENTIALS });
-    //         }
-
-    //         const payload = {
-    //             uid: admin.uid,
-    //             username: admin.username,
-    //             role: 'admin'
-    //         };
-
-    //         // Example secret key for signing the token
-    //         const secretKey = process.env.JWT_KEY;
-    //         const token = jwt.sign(payload, secretKey);
-    //         res.status(200).json({ ...loginSuccess, token, admin });
-    //     } catch (error) {
-    //         errorLogger(error)
-    //         console.error(error);
-    //         res.status(500).json({ ...INTERNAL_SERVER_ERROR });
-    //     }
-    // }
-    
     async login(req, res) {
         const { username, password } = req.body;
     
         try {
-            const admin = await UserData.findOne({ username });
-            console.log(admin);
+            const admin = await AdminData.findOne({ username });
     
-            if (
-                !admin ||
-                !admin.roles ||
-                !(admin.roles.includes('admin') || admin.roles.includes('manager'))
-            ) {
+            if (!admin || !admin.roles || !(admin.roles.includes('admin') || admin.roles.includes('manager'))) {
                 return res.status(401).json({ ...INVALID_CREDENTIALS });
+            }
+
+            if (admin.blockStatus === 1) {
+                return res.status(403).json({ code: 403, message: 'Admin account is blocked.' });
             }
     
             const isMatch = await bcrypt.compare(password, admin.password);
             if (!isMatch) {
-                console.log('here', "==========", isMatch);
                 return res.status(401).json({ ...INVALID_CREDENTIALS });
             }
     
-            // Dynamically determine the highest role
             let role = null;
             if (admin.roles.includes('admin')) {
                 role = 'admin';
             } else if (admin.roles.includes('manager')) {
                 role = 'manager';
             }
-            console.log("--------------------------------------", role);
+
             const payload = {
                 uid: admin.uid,
                 username: admin.username,
-                role // will be either 'admin' or 'manager'
+                role,
+                adminId: admin.adminId
             };
     
             const secretKey = process.env.JWT_KEY;
             const token = jwt.sign(payload, secretKey);
             
-            // Update lastActivity on admin login
-            await UserData.updateOne({ uid: admin.uid }, { $set: { lastActivity: new Date() } });
+            await AdminData.updateOne({ uid: admin.uid }, { $set: { lastActivity: new Date() } });
+
+            const safeAdmin = admin.toObject();
+            delete safeAdmin.password;
             
-            res.status(200).json({ ...loginSuccess, token, admin });
+            res.status(200).json({ ...loginSuccess, token, admin: safeAdmin });
         } catch (error) {
             errorLogger(error);
             console.error(error);
@@ -104,22 +63,34 @@ class ADMIN {
     }
     
     async createAdmin(req, res) {
-        const { username, password } = req.body;
+        const { username, password, name, email, mobile, roles } = req.body;
         try {
-            // Check if admin with the same username already exists
-            const existingAdmin = await Admin.findOne({ username });
+            const existingAdmin = await AdminData.findOne({ username });
             if (existingAdmin) {
-                return res.status(400).json({ message: 'Admin with this username already exists' });
+                return res.status(USERNAME_ALREADY_EXISTS.code).json({ ...USERNAME_ALREADY_EXISTS });
             }
 
-            // Hash the password
             const hashedPassword = await bcrypt.hash(password, 10);
+            const uid = await nextPanelUid('admin');
 
-            // Create new admin
-            const newAdmin = new Admin({ username, password: hashedPassword, uid: 1 });
+            const newAdmin = new AdminData({
+                uid,
+                username,
+                password: hashedPassword,
+                name: name || username,
+                email: email || '',
+                mobile: mobile || '',
+                roles: roles && roles.length ? roles : ['admin'],
+                status: 1,
+                joining_date: new Date(),
+                lastActivity: new Date()
+            });
             await newAdmin.save();
+            await ensurePanelWallet(AdminWallet, uid);
 
-            res.status(201).json({ ...registrationSuccess, admin: newAdmin });
+            const safeAdmin = newAdmin.toObject();
+            delete safeAdmin.password;
+            res.status(201).json({ ...registrationSuccess, admin: safeAdmin });
         } catch (error) {
             errorLogger(error)
             console.error(error);
@@ -409,52 +380,46 @@ class ADMIN {
     }
 
     async updatePassword(req, res) {
-    try {
-        const { oldPassword, newPassword } = req.body;
+        try {
+            const { uid } = req.user;
+            const currentPassword = req.body.currentPassword || req.body.oldPassword;
+            const { newPassword } = req.body;
 
-        console.log("rsjlkj",req.body )
+            if (!currentPassword || !newPassword) {
+                return res.status(400).json({ success: false, message: 'Current and new password are required.' });
+            }
 
-        if (req.user?.uid !== 1) {
-            return res.status(403).json({ success: false, message: 'Access denied' });
+            const user = await AdminData.findOne({ uid });
+            if (!user) {
+                return res.status(404).json({ success: false, message: 'User not found' });
+            }
+
+            const isMatch = await bcrypt.compare(currentPassword, user.password);
+            if (!isMatch) {
+                return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+            }
+
+            const isStrongPassword = await form_validator.generatePassword(newPassword);
+            if (!isStrongPassword.status) {
+                return res.status(400).json({ ...isStrongPassword });
+            }
+
+            const hashedPassword = await form_validator.hashPassword(isStrongPassword.password);
+            await AdminData.updateOne({ uid }, { $set: { password: hashedPassword } });
+
+            return res.status(200).json({ success: true, message: 'Password updated successfully' });
+        } catch (err) {
+            errorLogger(err);
+            return res.status(500).json({ success: false, message: 'Internal server error' });
         }
-
-        if (!oldPassword || !newPassword || newPassword.length < 6) {
-            return res.status(400).json({ success: false, message: 'Invalid password input' });
-        }
-         console.log("ksjdfk", req.user)
-        // Fetch user with uid: 1
-        if(req.user.uid !== 1){
-            return res.status(403).json({ success: false, message: 'Acceses Denied' });
-        }
-        const user = await UserData.findOne({ uid: 1 });
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
-
-        // Compare old password
-        const isMatch = await bcrypt.compare(oldPassword, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ success: false, message: 'Old password is incorrect' });
-        }
-
-        // Hash and update the new password
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await UserData.updateOne({ uid: 1 }, { $set: { password: hashedPassword } });
-
-        res.status(200).json({ success: true, message: 'Password updated successfully' });
-
-    } catch (err) {
-        console.error('Error updating password:', err);
-        res.status(500).json({ success: false, message: 'Internal server error' });
     }
-}
 
     async forgotPassword(req, res) {
         try {
             const { username, newPassword } = req.body;
             
-            // Find admin user by username
-            const admin = await UserData.findOne({ username });
+            // Find admin user by username in admin_data
+            const admin = await AdminData.findOne({ username });
             
             if (!admin) {
                 return res.status(404).json({ message: 'Admin not found' });
@@ -475,7 +440,7 @@ class ADMIN {
             const hashedPassword = await form_validator.hashPassword(isStrongPassword.password);
 
             // Update the password in the database
-            await UserData.updateOne({ uid: admin.uid }, { $set: { password: hashedPassword } });
+            await AdminData.updateOne({ uid: admin.uid }, { $set: { password: hashedPassword } });
 
             res.status(200).json({ ...REQUEST_SUCCESS });
         } catch (error) {

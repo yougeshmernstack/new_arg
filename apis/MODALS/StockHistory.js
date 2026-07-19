@@ -2,20 +2,36 @@ const mongoose = require('mongoose');
 
 const stockHistorySchema = new mongoose.Schema({
     historyId: { type: Number, unique: true },
-    franchiseId: { type: Number, required: true },
-    franchise_uid: { type: Number, required: true },
+    // Optional — admin-level stock changes do not belong to a franchise
+    franchiseId: { type: Number, default: null },
+    franchise_uid: { type: Number, default: null },
+    scope: {
+        type: String,
+        enum: ['admin', 'franchise'],
+        default: 'admin'
+    },
     productId: { type: Number, required: true },
     sku: { type: String, required: true },
-    // purchase | dispatch | return | cancel | damage | adjust
     action: {
         type: String,
-        enum: ['purchase', 'dispatch', 'return', 'cancel', 'damage', 'adjust'],
+        enum: [
+            'purchase',
+            'dispatch',
+            'return',
+            'cancel',
+            'damage',
+            'adjust',
+            'increase',
+            'decrease',
+            'set',
+            'order'
+        ],
         required: true
     },
     quantity: { type: Number, required: true },
     previous_available: { type: Number, default: 0 },
     new_available: { type: Number, default: 0 },
-    reference_type: { type: String, default: '' }, // order | invoice | dispatch
+    reference_type: { type: String, default: '' }, // order | invoice | dispatch | manual
     reference_id: { type: String, default: '' },
     remark: { type: String, default: '' },
     created_by: { type: Number, default: null },
@@ -25,7 +41,9 @@ const stockHistorySchema = new mongoose.Schema({
 });
 
 stockHistorySchema.index({ franchiseId: 1, productId: 1 });
+stockHistorySchema.index({ productId: 1 });
 stockHistorySchema.index({ created_date: -1 });
+stockHistorySchema.index({ scope: 1 });
 
 stockHistorySchema.pre('save', async function (next) {
     try {

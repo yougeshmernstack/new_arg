@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const UserData = require("../../MODALS/userData"); 
+const AdminData = require("../../MODALS/AdminData");
 const form_validator = require('../../utils/form-validators');
 const { errorLogger } = require('../../utils/logger');
 const { NOT_FOUND, INTERNAL_SERVER_ERROR, INVALID_INPUT } = require('../../utils/errorMessages');
@@ -183,8 +184,8 @@ class UPDATE {
                 return res.status(400).json({ message: 'Invalid input. All fields are required.' });
             }
     
-            // Find admin user by UID
-            const admin = await UserData.findOne( {uid} );
+            // Find admin user by UID from admin_data
+            const admin = await AdminData.findOne({ uid });
             if (!admin || !(admin.roles && admin.roles.includes('admin'))) {
                 return res.status(401).json({message: 'admin  not found.'});
             }

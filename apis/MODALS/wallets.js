@@ -21,28 +21,12 @@ const wallets = [
         count_in: null
     },
     {
-        id: 2,
-        name: "Matching Bonus",
-        wallet_type: "income",
-        status: 1,
-        slug: 'matching_income',
-        count_in: 'main_wallet'
-    },
-    {
         id: 3,
         name: "Fund Wallet",
         wallet_type: "wallet",
-        status: 0,
+        status: 1,
         slug: 'fund_wallet',
         count_in: null
-    },
-    {
-        id: 4,
-        name: "Direct Referral Bonus",
-        wallet_type: "income",
-        status: 0,
-        slug: 'level_income',
-        count_in: 'main_wallet'
     },
     {
         id: 5,
@@ -72,27 +56,34 @@ const wallets = [
     },
     {
         id: 8,
-        name: "Working Wallet",
-        wallet_type: "wallet",
-        status: 0,
-        slug: 'working_wallet',
-        count_in: null
+        name: "Direct Income",
+        wallet_type: "income",
+        status: 1,
+        slug: 'direct_income',
+        count_in: 'main_wallet'
     },
-
     {
         id: 9,
-        name: "Instant Leadership Reward",
+        name: "Matching Income",
         wallet_type: "income",
-        status: 0,
-        slug: 'leadership_reward',
+        status: 1,
+        slug: 'matching_income',
         count_in: 'main_wallet'
     },
     {
         id: 10,
-        name: "Team Activity Bonus",
+        name: "Upline Income",
         wallet_type: "income",
-        status: 0,
-        slug: 'team_bonus',
+        status: 1,
+        slug: 'upline_income',
+        count_in: 'main_wallet'
+    },
+    {
+        id: 11,
+        name: "Repurchase Matching Income",
+        wallet_type: "income",
+        status: 1,
+        slug: 'repurchase_matching_income',
         count_in: 'main_wallet'
     }
 ];
@@ -104,6 +95,29 @@ async function seedWallets() {
         const count = await Wallets.countDocuments();
         if (count === 0) {
             await Wallets.insertMany(wallets);
+        } else {
+            // Keep fund_wallet active for panel deposit flow
+            await Wallets.updateOne(
+                { slug: 'fund_wallet' },
+                { $set: { status: 1, name: 'Fund Wallet', wallet_type: 'wallet' } },
+                { upsert: true }
+            );
+            // Ensure income wallets exist and roll into main_wallet
+            for (const w of wallets.filter((item) => item.wallet_type === 'income')) {
+                await Wallets.updateOne(
+                    { slug: w.slug },
+                    {
+                        $set: {
+                            id: w.id,
+                            name: w.name,
+                            wallet_type: w.wallet_type,
+                            status: w.status,
+                            count_in: w.count_in
+                        }
+                    },
+                    { upsert: true }
+                );
+            }
         }
     } catch (e) {
         // Swallow errors during startup seeding to avoid crashing

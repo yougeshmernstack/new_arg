@@ -1,11 +1,13 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const UserData = require('../../MODALS/userData');
+const ThemeUser = require('../../MODALS/ThemeUser');
+const ThemeUserWallet = require('../../MODALS/ThemeUserWallet');
 const CommerceOrder = require('../../MODALS/CommerceOrder');
 const Cart = require('../../MODALS/Cart');
 const Wishlist = require('../../MODALS/Wishlist');
-const Notification = require('../../MODALS/Notification');
 const form_validator = require('../../utils/form-validators');
+const { nextPanelUid } = require('../../utils/panelIdentity');
+const { ensurePanelWallet } = require('../../utils/panelWallet');
 const { errorLogger } = require('../../utils/logger');
 const { loginSuccess, registrationSuccess, REQUEST_SUCCESS } = require('../../utils/successMessages');
 const {
@@ -15,17 +17,43 @@ const {
     INVALID_USERNAME
 } = require('../../utils/errorMessages');
 
+function sanitizeThemeUser(doc) {
+    if (!doc) return null;
+    const obj = doc.toObject ? doc.toObject() : { ...doc };
+    delete obj.password;
+    return obj;
+}
+
 class THEME_AUTH {
     async register(req, res) {
         try {
             const { name, email, mobile, password, username } = req.body;
 
-            const validUserNameResult = await form_validator.generateUserName(username || 'customer');
+            const usernameInput = String(username || '').trim();
+            let validUserNameResult;
+            if (usernameInput) {
+                validUserNameResult = await form_validator.generateUserName(usernameInput);
+            } else {
+                let attempts = 0;
+                let exists = true;
+                validUserNameResult = { status: false };
+                while (attempts < 12 && exists) {
+                    validUserNameResult = await form_validator.generateAutomaticUserName('agl');
+                    if (!validUserNameResult.status) break;
+                    exists = await ThemeUser.findOne({ username: validUserNameResult.userName });
+                    attempts += 1;
+                }
+                if (exists) {
+                    return res.status(500).json({ code: 500, message: 'Could not generate a unique username. Please try again.' });
+                }
+            }
             if (!validUserNameResult.status) {
-                return res.status(INVALID_USERNAME.code).json({ ...INVALID_USERNAME });
+                const code = validUserNameResult.code || INVALID_USERNAME.code;
+                const message = validUserNameResult.message || INVALID_USERNAME.message;
+                return res.status(code).json({ code, message });
             }
 
-            const isUsernameExist = await UserData.findOne({ username: validUserNameResult.userName });
+            const isUsernameExist = await ThemeUser.findOne({ username: validUserNameResult.userName });
             if (isUsernameExist) {
                 return res.status(USERNAME_ALREADY_EXISTS.code).json({ ...USERNAME_ALREADY_EXISTS });
             }
@@ -43,37 +71,36 @@ class THEME_AUTH {
             }
 
             const hashedPassword = await form_validator.hashPassword(isStrongPassword.password);
-            const totalUsers = await UserData.countDocuments();
+            const uid = await nextPanelUid('theme');
 
-            const user = new UserData({
+            const user = new ThemeUser({
+                uid,
+                username: validUserNameResult.userName,
+                password: hashedPassword,
                 name,
                 email,
                 mobile,
-                password: hashedPassword,
-                username: validUserNameResult.userName,
-                uid: totalUsers + 1,
-                roles: ['theme'],
-                user_type: 'theme',
                 status: 1,
-                sponsor_Id: 0,
                 joining_date: new Date(),
                 lastActivity: new Date()
             });
             const savedUser = await user.save();
 
             await new Cart({ uid: savedUser.uid, items: [] }).save();
+            await ensurePanelWallet(ThemeUserWallet, savedUser.uid);
 
             const payload = {
                 uid: savedUser.uid,
                 username: savedUser.username,
-                role: 'theme'
+                role: 'theme',
+                themeUserId: savedUser.themeUserId
             };
             const token = jwt.sign(payload, process.env.JWT_KEY);
 
             return res.status(201).json({
                 ...registrationSuccess,
                 token,
-                user: { ...savedUser.toObject(), password: undefined }
+                user: sanitizeThemeUser(savedUser)
             });
         } catch (error) {
             errorLogger(error);
@@ -84,8 +111,8 @@ class THEME_AUTH {
     async login(req, res) {
         const { username, password } = req.body;
         try {
-            const user = await UserData.findOne({ username });
-            if (!user || !user.roles || !user.roles.includes('theme')) {
+            const user = await ThemeUser.findOne({ username });
+            if (!user) {
                 return res.status(401).json({ ...INVALID_CREDENTIALS });
             }
             if (user.blockStatus === 1) {
@@ -100,12 +127,13 @@ class THEME_AUTH {
             const payload = {
                 uid: user.uid,
                 username: user.username,
-                role: 'theme'
+                role: 'theme',
+                themeUserId: user.themeUserId
             };
             const token = jwt.sign(payload, process.env.JWT_KEY);
-            await UserData.updateOne({ uid: user.uid }, { $set: { lastActivity: new Date() } });
+            await ThemeUser.updateOne({ uid: user.uid }, { $set: { lastActivity: new Date() } });
 
-            return res.status(200).json({ ...loginSuccess, token, user });
+            return res.status(200).json({ ...loginSuccess, token, user: sanitizeThemeUser(user) });
         } catch (error) {
             errorLogger(error);
             return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
@@ -115,7 +143,7 @@ class THEME_AUTH {
     async getProfile(req, res) {
         try {
             const { uid } = req.user;
-            const user = await UserData.findOne({ uid }).select('-password');
+            const user = await ThemeUser.findOne({ uid }).select('-password');
             return res.status(200).json({ status: 200, message: 'Profile fetched.', user });
         } catch (error) {
             errorLogger(error);
@@ -133,10 +161,45 @@ class THEME_AUTH {
             if (mobile) updates.mobile = mobile;
             if (photo) updates.photo = photo;
             if (Object.keys(updates).length) {
-                await UserData.updateOne({ uid }, { $set: updates });
+                await ThemeUser.updateOne({ uid }, { $set: updates });
             }
-            const user = await UserData.findOne({ uid }).select('-password');
+            const user = await ThemeUser.findOne({ uid }).select('-password');
             return res.status(200).json({ ...REQUEST_SUCCESS, user });
+        } catch (error) {
+            errorLogger(error);
+            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
+        }
+    }
+
+    async changePassword(req, res) {
+        try {
+            const { uid } = req.user;
+            const currentPassword = req.body.currentPassword || req.body.oldPassword;
+            const { newPassword } = req.body;
+
+            if (!currentPassword || !newPassword) {
+                return res.status(400).json({ code: 400, message: 'Current and new password are required.' });
+            }
+
+            const user = await ThemeUser.findOne({ uid });
+            if (!user) {
+                return res.status(401).json({ ...INVALID_CREDENTIALS });
+            }
+
+            const passwordMatch = await bcrypt.compare(currentPassword, user.password);
+            if (!passwordMatch) {
+                return res.status(400).json({ code: 400, message: 'Current password is incorrect.' });
+            }
+
+            const isStrongPassword = await form_validator.generatePassword(newPassword);
+            if (!isStrongPassword.status) {
+                return res.status(400).json({ ...isStrongPassword });
+            }
+
+            const hashedPassword = await form_validator.hashPassword(isStrongPassword.password);
+            await ThemeUser.updateOne({ uid }, { $set: { password: hashedPassword } });
+
+            return res.status(200).json({ ...REQUEST_SUCCESS, message: 'Password updated successfully.' });
         } catch (error) {
             errorLogger(error);
             return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
@@ -146,7 +209,7 @@ class THEME_AUTH {
     async getDashboard(req, res) {
         try {
             const { uid } = req.user;
-            const [orderStats, cart, wishlistCount, unreadNotifications] = await Promise.all([
+            const [orderStats, cart, wishlistCount, wallet] = await Promise.all([
                 CommerceOrder.aggregate([
                     { $match: { buyer_uid: uid, buyer_role: 'theme' } },
                     {
@@ -159,7 +222,7 @@ class THEME_AUTH {
                 ]),
                 Cart.findOne({ uid }),
                 Wishlist.countDocuments({ uid }),
-                Notification.countDocuments({ uid, role: 'theme', is_read: 0 })
+                ThemeUserWallet.findOne({ uid })
             ]);
 
             return res.status(200).json({
@@ -169,7 +232,7 @@ class THEME_AUTH {
                     orders: orderStats[0] || { total_orders: 0, total_amount: 0 },
                     cart_items: cart ? cart.items.length : 0,
                     wishlist_count: wishlistCount,
-                    unreadNotifications
+                    wallet
                 }
             });
         } catch (error) {
@@ -178,28 +241,6 @@ class THEME_AUTH {
         }
     }
 
-    async getNotifications(req, res) {
-        try {
-            const { uid } = req.user;
-            const page = parseInt(req.query.page, 10) || 1;
-            const limit = parseInt(req.query.limit, 10) || 20;
-            const skip = (page - 1) * limit;
-            const filter = { uid, role: 'theme' };
-            const [list, total] = await Promise.all([
-                Notification.find(filter).sort({ created_date: -1 }).skip(skip).limit(limit),
-                Notification.countDocuments(filter)
-            ]);
-            return res.status(200).json({
-                status: 200,
-                message: 'Notifications fetched.',
-                data: list,
-                pagination: { page, limit, total, pages: Math.ceil(total / limit) }
-            });
-        } catch (error) {
-            errorLogger(error);
-            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
-        }
-    }
 }
 
 class ADMIN_THEME {
@@ -208,7 +249,7 @@ class ADMIN_THEME {
             const page = parseInt(req.query.page, 10) || 1;
             const limit = parseInt(req.query.limit, 10) || 20;
             const skip = (page - 1) * limit;
-            const filter = { roles: 'theme' };
+            const filter = {};
             if (req.query.search) {
                 filter.$or = [
                     { name: { $regex: req.query.search, $options: 'i' } },
@@ -219,8 +260,8 @@ class ADMIN_THEME {
             }
 
             const [list, total] = await Promise.all([
-                UserData.find(filter).select('-password').sort({ joining_date: -1 }).skip(skip).limit(limit),
-                UserData.countDocuments(filter)
+                ThemeUser.find(filter).select('-password').sort({ joining_date: -1 }).skip(skip).limit(limit),
+                ThemeUser.countDocuments(filter)
             ]);
 
             return res.status(200).json({

@@ -16,6 +16,7 @@ const transactionSchema = new mongoose.Schema({
     source: { type: String },
     to_from_username: { type: String },
     wallet_type: { type: String, required: true },
+    panel: { type: String, default: null }, // distributor | franchise | theme | admin
     level: { type: String },
     level_distribution_status: { type: Number,default:0 },
     community_distribution_status: { type: Number,default:0 },
@@ -50,11 +51,7 @@ const transactionSchema = new mongoose.Schema({
   overall_open: { type: Number, default: 0 },
   overall_close: { type: Number, default: 0 },
   Re_purchase_wallet: { type: Number },
-  metadata: {
-    cycle: Number,         // Which cycle this payment belongs to
-    cycleDuration: Number, // Duration of this cycle
-    nextCycle: Number      // Next cycle after this payment
-  }
+  metadata: { type: mongoose.Schema.Types.Mixed, default: null }
 }, {
     timestamps: true
 });

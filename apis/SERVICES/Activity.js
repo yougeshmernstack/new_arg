@@ -1,13 +1,24 @@
 const advance_info = require('../MODALS/advanceInfo');
 const Activity = require('../MODALS/Activity');
 const Transaction = require('../MODALS/transactions');
-const UserData = require('../MODALS/userData');
-const UserWallet = require('../MODALS/userWallets');
+const Distributor = require('../MODALS/Distributor');
+const { getPanelWallets, resolveWalletModel } = require('../utils/panelWallet');
 const { ACTIVITY_NOT_ACTIVE, INTERNAL_SERVER_ERROR, INSUFFICIENT_FUND } = require('../utils/errorMessages');
 const { errorLogger, logConditionFailure, logRollback } = require('../utils/logger');
 const { REQUEST_SUCCESS } = require('../utils/successMessages');
 const transaction = require('./Transaction'); 
 const queueManager = require('./TransactionQueue');
+
+function safeRequire(modulePath) {
+    try {
+        return require(modulePath);
+    } catch (err) {
+        return null;
+    }
+}
+
+const UserData = safeRequire('../MODALS/userData');
+const UserWallet = safeRequire('../MODALS/userWallets');
 
 class ACTIVITY {
     
@@ -18,6 +29,10 @@ class ACTIVITY {
             const { role } = req.user;
             const { amount, activity, breakFunction, Status, uid, to_from, note, account = null,release = 1, token_address=null,
                 token_symbol=null , TDS=0} = req.activity;
+
+            if (!UserData || !UserWallet) {
+                return res.status(500).json({ message: 'Legacy wallet path unavailable' });
+            }
            
             const user = await UserData.findOne({ uid });
     
@@ -129,104 +144,160 @@ class ACTIVITY {
     async actInternally(uid, activity) {
         try {
             const transaction = require('./Transaction');
-            const user = await UserData.findOne({ uid });
-            logConditionFailure(`here....actvity called for uid ${uid}`)
-            const { amount, activity_name, Status, to_from, level, order_Id=0,profit_Share=0 ,withdrawal_amount=0, TDS = 0,tx_charge = 0, account = null, release = 1, currentDate,business=0,order_amount ,income_percent=0,user_package,order_Activation_date,user_joining_date,metadata=null,rankId=null,pancard=null} = activity;
+            const {
+                amount,
+                activity_name,
+                Status,
+                to_from,
+                level,
+                order_Id = 0,
+                profit_Share = 0,
+                withdrawal_amount = 0,
+                TDS = 0,
+                tx_charge = 0,
+                account = null,
+                release = 1,
+                currentDate,
+                business = 0,
+                order_amount,
+                income_percent = 0,
+                user_package,
+                order_Activation_date,
+                user_joining_date,
+                metadata = null,
+                rankId = null,
+                pancard = null,
+                panel = null,
+                reqest_tx_Id = null,
+                proofUrl = null
+            } = activity;
 
+            logConditionFailure(`here....actvity called for uid ${uid}`)
 
             const activityDetails = await Activity.findOne({ name: activity_name });
 
             if (!activityDetails || activityDetails.status === 0) {
-                console.log("activity not found",activity_name)
+                console.log("activity not found", activity_name)
                 logConditionFailure(`activity not found`)
-                return;
+                return null;
             }
 
-            const hasRequiredRole = activityDetails.allowed_roles.includes("user");
-            const isDisallowed = user.disabled_activities.includes(activityDetails.act_id);
-            // console.log("hasRequiredRole",hasRequiredRole)
-            // console.log("isDisallowed",isDisallowed)
-            if (isDisallowed) {
-                logConditionFailure(`activity not found  role for this user ...`)
-                return;
-            }
-            if (!hasRequiredRole) {
-                logConditionFailure(`activity not found  role for this user`)
-                return;
+            const isPanel = panel && resolveWalletModel(panel);
+            let user = null;
+            let disabledActivities = [];
+
+            if (isPanel) {
+                if (panel === 'distributor') {
+                    user = await Distributor.findOne({ uid });
+                }
+                if (!user) {
+                    logConditionFailure(`panel user not found for ${panel} uid ${uid}`)
+                    return null;
+                }
+                const roleOk =
+                    activityDetails.allowed_roles.includes(panel) ||
+                    activityDetails.allowed_roles.includes('admin') ||
+                    activityDetails.allowed_roles.includes('user');
+                if (!roleOk) {
+                    logConditionFailure(`activity not allowed for panel role ${panel}`)
+                    return null;
+                }
+            } else {
+                if (!UserData || !UserWallet) {
+                    logConditionFailure(`legacy UserData/UserWallet unavailable`)
+                    return null;
+                }
+                user = await UserData.findOne({ uid });
+                if (!user) {
+                    logConditionFailure(`user not found`)
+                    return null;
+                }
+                disabledActivities = user.disabled_activities || [];
+                const hasRequiredRole = activityDetails.allowed_roles.includes("user");
+                const isDisallowed = disabledActivities.includes(activityDetails.act_id);
+                if (isDisallowed) {
+                    logConditionFailure(`activity not found  role for this user ...`)
+                    return null;
+                }
+                if (!hasRequiredRole) {
+                    logConditionFailure(`activity not found  role for this user`)
+                    return null;
+                }
             }
 
             const walletNames = activityDetails.use_wallet.map(wallet => wallet.wallet_name);
+            let wallets = [];
 
-            const userWallets = await UserWallet.aggregate([
-                { $match: { uid } },
-                { $unwind: '$wallets' },
-                { $match: { 'wallets.slug': { $in: walletNames } } },
-                { $group: { _id: '$_id', wallets: { $push: '$wallets' } } }
-            ]);
-
-            if (userWallets.length === 0) {
-                logConditionFailure(`userwallet not  found`)
-
-                return;
+            if (isPanel) {
+                wallets = await getPanelWallets(panel, uid, walletNames);
+            } else {
+                const userWallets = await UserWallet.aggregate([
+                    { $match: { uid } },
+                    { $unwind: '$wallets' },
+                    { $match: { 'wallets.slug': { $in: walletNames } } },
+                    { $group: { _id: '$_id', wallets: { $push: '$wallets' } } }
+                ]);
+                if (userWallets.length === 0) {
+                    logConditionFailure(`userwallet not  found`)
+                    return null;
+                }
+                wallets = userWallets[0].wallets;
             }
 
-            const { wallets } = userWallets[0];
+            if (!wallets.length) {
+                logConditionFailure(`userwallet not  found`)
+                return null;
+            }
 
-            const fullBalance = wallets.reduce((total, wallet) => {
-                const walletInfo = activityDetails.use_wallet.find(w => w.wallet_name === wallet.slug);
-                if (walletInfo) {
-                    return total + wallet.value;
-                }
-                return total;
-            }, 0);
-
-            const balance = parseFloat(fullBalance).toFixed(5);
             const hasEnoughFunds = activityDetails.use_wallet.every(wallet => {
                 const requiredAmount = amount * (wallet.percentage / 100);
                 const correspondingWallet = wallets.find(w => w.slug === wallet.wallet_name);
                 return correspondingWallet && correspondingWallet.value >= requiredAmount;
             });
-            
+
             if (!hasEnoughFunds && activityDetails.debit_credit === 'debit') {
                 logConditionFailure(`balance not enough for activity ${activityDetails.name}`)
-                return;
-            } else {
-                // Use pancard from activity parameter, fallback to user.pancard for withdrawal
-                const userPancard = activity_name === 'withdrawal' ? (pancard || user.pancard || null) : null;
-                
-                const transactionData = activityDetails.use_wallet.map(wallet => ({
-                    uid,
-                    to_from: to_from,
-                    level,
-                    tx_type: activityDetails.name,
-                    debit_credit: activityDetails.debit_credit,
-                    wallet_type: wallet.wallet_name,
-                    amount: amount * (wallet.percentage / 100),
-                    source: activityDetails.name,
-                    Status,
-                    business,
-                    order_amount,
-                    order_Id,
-                    release,
-                    TDS,
-                    time:currentDate,
-                    account,
-                    tx_charge,
-                    withdrawal_amount,
-                    income_percent,
-                    user_package,
-                    order_Activation_date,
-                    user_joining_date,
-                    metadata,
-                    rankId,
-                    ...(userPancard ? { pancard: userPancard } : {})
-                }));
-                // console.log("transactionData",transactionData)
-                await transaction.insert(transactionData);
+                return null;
             }
+
+            const userPancard = activity_name === 'withdrawal' ? (pancard || user.pancard || null) : null;
+
+            const transactionData = activityDetails.use_wallet.map(wallet => ({
+                uid,
+                to_from: to_from,
+                level,
+                tx_type: activityDetails.name,
+                debit_credit: activityDetails.debit_credit,
+                wallet_type: wallet.wallet_name,
+                amount: amount * (wallet.percentage / 100),
+                source: activityDetails.name,
+                Status,
+                business,
+                order_amount,
+                order_Id,
+                release,
+                TDS,
+                time: currentDate,
+                account,
+                tx_charge,
+                withdrawal_amount,
+                income_percent,
+                user_package,
+                order_Activation_date,
+                user_joining_date,
+                metadata,
+                rankId,
+                panel: panel || null,
+                ...(reqest_tx_Id ? { reqest_tx_Id } : {}),
+                ...(proofUrl ? { proofUrl } : {}),
+                ...(userPancard ? { pancard: userPancard } : {})
+            }));
+
+            const saved = await transaction.insert(transactionData);
+            return saved;
         } catch (error) {
             errorLogger(error);
-            return;
+            return null;
         }
     }
 

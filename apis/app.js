@@ -1,8 +1,6 @@
 require('dotenv').config();
 require('./connections')
-require('./SERVICES/test')
 require('./MODALS/wallets')
-require('./Crons')
 const express = require('express');
 const http = require('http');
 const { setupWebSocket } = require('./webSocket/broadCast');
@@ -19,25 +17,16 @@ app.use(cors(corsOptions));
 app.use(express.static('public'));
 const crypto = require('crypto');
 const bodyParser = require('body-parser');
-const GAME = require('./API/GAME/gameClass');
-const u_router = require('./ROUTES/usreRoutes');
-const project_setup = require('./utils/project-setup');
 const { getAllRoutes } = require('./utils/get-all-routes');
 const authenticator = require('./utils/authuser');
-const runGame = require('./SERVICES/game');
-const roiClosing = require('./SERVICES/Roi');
 const admin = require('./ROUTES/adminRoutes');
 const franchise = require('./ROUTES/franchiseRoutes');
 const distributor = require('./ROUTES/distributorRoutes');
 const themeRouter = require('./ROUTES/themeRoutes');
 const { default: axios } = require('axios');
-const PaymentAction = require('./API/ADMIN/PaymentOptions');
-const Rewards = require('./SERVICES/Rank&Rewards');
 const port = process.env.PORT;
 const path = require('path');
 const { sendEmail } = require('./SERVICES/EmailService');
-const versionService = require('./SERVICES/VersionService');
-require('./SERVICES/transferData')
 var jsonParser = bodyParser.json();
 app.use(jsonParser)
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -55,7 +44,6 @@ app.get('/welcome', (req, res) => {
     
     res.render('welcome', user);
 });
-app.use('/user', u_router)
 app.use('/franchise', franchise)
 app.use('/distributor', distributor)
 app.use('/theme', themeRouter)
@@ -82,20 +70,12 @@ app.get('/send-welcome-email', async (req, res) => {
     }
 });
 app.use('/admin', admin)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 app.use(express.static(__dirname + '/uploads/'))
 const merchantKey = process.env.MERCHANT_KEY;
 app.get('/', async (req, res) => {
     res.send('hello bharat betteries testing')
 });
-app.get('/roi_closing', async (req, res) => {
-    await roiClosing.roiIncome()
-    res.send('hello bharat betteries')
-});
-app.get('/roi_level_closing', async (req, res) => {
-    await roiClosing.roiLevelIncome()
-    res.send('hello bharat betteries')
-});
-app.post('/create-version',versionService.createVersion)
 const clients = {};
 function sendDataToUser(userId, data) {
     const client = clients[userId];
@@ -135,23 +115,7 @@ function sendDataToUser(userId, data) {
         // //  }
         //     res.json({DATA:'RES'})
         // });
-        app.post('/webhooks/slotegrator/v1/transactions/execute', (req, res, next) => {
-            const userId = req.body.player_id;
-            const client = clients[userId];
-            if (client) {
-                req.client = client;
-            } else {
-                console.log(`Client with userId ${userId} is not connected.`);
-            }
-            next()
-}, authenticator.SlotegratorAuth, runGame.play_game);
-app.get('/self-validate', GAME.self_validation)
 app.get('/project_setup', async (req, res) => {
-    //  const RESULT = await project_setup.save_advance()
-    //  const user = await project_setup.save_first_user()
-    // const company = await project_setup.saveCompanyInfo()
-    // const plan = await project_setup.savePlan()
-    // PaymentAction.seedPaymentOptions()
     res.json({ DATA: 'RES'})
 });
 

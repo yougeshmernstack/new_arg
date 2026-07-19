@@ -1,10 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { brand } from "@/data/brand";
+import { HeaderAuthLinks } from "@/components/HeaderAuthLinks";
 
 const navItems = [
   { href: "/", label: "Home" },
   { href: "/products", label: "Products" },
+  { href: "/shop", label: "Live Shop" },
   { href: "/packages", label: "Packages" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" }
@@ -32,10 +34,14 @@ export function Header() {
         ))}
       </nav>
       <div className="header-actions">
-        <Link className="header-link" href="/cart">
+        <HeaderAuthLinks />
+        <Link className="header-link" href="/shop/cart">
           Cart
         </Link>
-        <Link className="button button-small" href="/checkout">
+        <Link className="header-link" href="/shop/orders">
+          Orders
+        </Link>
+        <Link className="button button-small" href="/shop/checkout">
           Checkout
         </Link>
       </div>

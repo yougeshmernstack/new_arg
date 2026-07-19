@@ -8,16 +8,26 @@ function hasTokenInUrl() {
   return Boolean(new URLSearchParams(window.location.search).get('token'));
 }
 
+function userFromProfile(profile) {
+  if (!profile) return null;
+  return {
+    uid: profile.uid,
+    username: profile.username,
+    role: 'distributor',
+    distributorId: profile.distributorId,
+  };
+}
+
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => storage.getToken());
-  const [user, setUser] = useState(() => storage.getUser());
+  const [user, setUser] = useState(() => storage.getUser() || userFromProfile(storage.getProfile()));
   const [profile, setProfile] = useState(() => storage.getProfile());
   const [loading, setLoading] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(hasTokenInUrl);
 
   const persistSession = useCallback((data) => {
-    const nextUser = data.user || null;
     const nextProfile = data.distributor || null;
+    const nextUser = data.user || userFromProfile(nextProfile);
     storage.setToken(data.token);
     storage.setUser(nextUser);
     storage.setProfile(nextProfile);

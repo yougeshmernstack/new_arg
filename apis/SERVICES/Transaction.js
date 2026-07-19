@@ -1,16 +1,25 @@
 const advance_info = require("../MODALS/advanceInfo");
 const getNextTxId = require("../MODALS/Counter");
 const Transaction = require("../MODALS/transactions");
-const UserData = require("../MODALS/userData");
-const UserWallet = require("../MODALS/userWallets");
 const Wallets = require("../MODALS/wallets");
-const Ranks = require("../MODALS/Ranks")  //Rank model
-const Rewards = require("../SERVICES/Rank&Rewards");
-const Team = require("../SERVICES/UpdateTeam");
+const { getPanelWallets, updatePanelWalletValue, resolveWalletModel } = require("../utils/panelWallet");
 
 const { errorLogger } = require("../utils/logger");
-const UserPaymentOption = require("../MODALS/UserPaymentOption");
 
+function safeRequire(modulePath) {
+    try {
+        return require(modulePath);
+    } catch (err) {
+        return null;
+    }
+}
+
+const UserData = safeRequire("../MODALS/userData");
+const UserWallet = safeRequire("../MODALS/userWallets");
+const UserPaymentOption = safeRequire("../MODALS/UserPaymentOption");
+const Ranks = safeRequire("../MODALS/Ranks");
+const Rewards = safeRequire("../SERVICES/Rank&Rewards");
+const Team = safeRequire("../SERVICES/UpdateTeam");
 
 class TRANSACTION {
     async insert(transactionData) {
@@ -52,11 +61,9 @@ class TRANSACTION {
                     // Update wallets for the saved transaction
                     await this.updateWallet(savedTransaction.tx_Id, Status, release);
 
-                    const { withdrawal } = await advance_info.findOne();
-                    const { instantwithdrawal } = withdrawal
-                    if (savedTransaction.source === "roi_income") {
+                    if (UserData && savedTransaction.source === "roi_income") {
                         const userData = await UserData.findOne({ uid });
-                        userData.booster_income
+                        if (userData) userData.booster_income;
                     }
                 }
             }
@@ -138,15 +145,48 @@ class TRANSACTION {
     }
 
     async updateWallet(tx_Id, status, release) {
-        const { uid, wallet_type: slug, amount, source, debit_credit } = await Transaction.findOne({ tx_Id, status: 0 })
+        const txDoc = await Transaction.findOne({ tx_Id, status: 0 });
+        if (!txDoc) return;
+
+        const { uid, wallet_type: slug, amount, source, debit_credit, panel } = txDoc;
         if (!uid || !slug || !amount || !debit_credit) {
             return;
         }
         try {
-            const { wallets } = await UserWallet.findOne({ uid, 'wallets.slug': slug }, { 'wallets.$': 1 });
+            // Panel wallets (distributor / franchise / theme / admin)
+            if (panel && resolveWalletModel(panel)) {
+                const wallets = await getPanelWallets(panel, uid, [slug]);
+                const entry = wallets.find((w) => w.slug === slug);
+                if (!entry) return;
+
+                let newValue;
+                if (debit_credit === 'credit') {
+                    newValue = Number(entry.value) + Number(amount);
+                } else {
+                    newValue = Number(entry.value) - Number(amount);
+                }
+
+                if (release == 1) {
+                    await updatePanelWalletValue(panel, uid, slug, newValue);
+                }
+
+                await Transaction.findOneAndUpdate(
+                    { tx_Id },
+                    { status, release }
+                );
+                return;
+            }
+
+            // Legacy UserWallet path (optional — model may be absent)
+            if (!UserWallet) {
+                await Transaction.findOneAndUpdate({ tx_Id }, { status, release });
+                return;
+            }
+
+            const walletDoc = await UserWallet.findOne({ uid, 'wallets.slug': slug }, { 'wallets.$': 1 });
+            const wallets = walletDoc?.wallets;
             const sourceWallets = await UserWallet.findOne({ uid, 'wallets.slug': source }, { 'wallets.$': 1 });
             if (!wallets) {
-                // console.log("!wallets || wallets[0].value",)
                 return;
             }
             let newValue;
@@ -159,21 +199,19 @@ class TRANSACTION {
                 newValueSrc = (Number(sourceWallets?.wallets[0].value) - Number(amount))
             }
             if (release == 1) {
-                const updatedUserWallet = await UserWallet.findOneAndUpdate(
-                    { uid, 'wallets.slug': slug }, // Find the document with matching uid and 'main_wallet' slug
-                    { $set: { 'wallets.$.value': newValue } }, // Update the value of the main_wallet
-                    { new: true } // Return the updated document
+                await UserWallet.findOneAndUpdate(
+                    { uid, 'wallets.slug': slug },
+                    { $set: { 'wallets.$.value': newValue } },
+                    { new: true }
                 );
             }
-            console.log('wallet source', sourceWallets)
             if (sourceWallets) {
-                const updatedSrcWallet = await UserWallet.findOneAndUpdate(
-                    { uid, 'wallets.slug': source }, // Find the document with matching uid and 'main_wallet' slug
-                    { $set: { 'wallets.$.value': newValueSrc } }, // Update the value of the main_wallet
-                    { new: true } // Return the updated document
+                await UserWallet.findOneAndUpdate(
+                    { uid, 'wallets.slug': source },
+                    { $set: { 'wallets.$.value': newValueSrc } },
+                    { new: true }
                 );
             }
-
 
             await Transaction.findOneAndUpdate(
                 { tx_Id },
@@ -182,7 +220,6 @@ class TRANSACTION {
                     release
                 }
             );
-            //    const close_wallet = await this.updateOpenClose(tx_Id);
             return;
         } catch (error) {
             errorLogger(error)

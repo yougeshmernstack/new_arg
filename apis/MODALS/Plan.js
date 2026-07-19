@@ -190,6 +190,12 @@ const planSchema = new mongoose.Schema({
         status: { type: Number, enum: [0, 1], default: 1 },
         amount: { type: Number, default: 10 }
     },
+    // Direct sponsor income on package purchase — % of package BV
+    direct_income: {
+        income_type: { type: String, enum: ['fixed', 'percentage'], default: 'percentage' },
+        status: { type: Number, enum: [0, 1], default: 1 },
+        amount: { type: Number, default: 15 }
+    },
     instant_leadership_reward: {
         income_type: { type: String, enum: ['fix', 'percentage'], default: 'percentage' },
         status: { type: Number, enum: [0, 1], default: 1 },
@@ -203,7 +209,47 @@ const planSchema = new mongoose.Schema({
 
     buy_status: { type: Number, enum: [0, 1], default: 1 }
 
+}, {
+    collection: 'plan_data'
 });
 
 const PlansInfo = mongoose.model('PlansInfo', planSchema);
+
+async function ensurePlanData() {
+    try {
+        let plan = await PlansInfo.findOne({ planId: 1 });
+        if (!plan) {
+            plan = await PlansInfo.create({
+                planId: 1,
+                direct_income: {
+                    income_type: 'percentage',
+                    status: 1,
+                    amount: 15
+                }
+            });
+            return plan;
+        }
+        if (!plan.direct_income || plan.direct_income.amount == null) {
+            plan.direct_income = {
+                income_type: plan.direct_income?.income_type || 'percentage',
+                status: plan.direct_income?.status != null ? plan.direct_income.status : 1,
+                amount: 15
+            };
+            await plan.save();
+        }
+        return plan;
+    } catch (err) {
+        return null;
+    }
+}
+
+if (mongoose.connection.readyState === 1) {
+    ensurePlanData();
+} else {
+    mongoose.connection.once('connected', () => {
+        ensurePlanData();
+    });
+}
+
 module.exports = PlansInfo;
+module.exports.ensurePlanData = ensurePlanData;

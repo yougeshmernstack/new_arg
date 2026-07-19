@@ -1,5 +1,5 @@
 const { PermissionRoute } = require('../../MODALS/Permission');
-const UserData = require('../../MODALS/userData');
+const AdminData = require('../../MODALS/AdminData');
 class ROUTES {
     /**
      * Fetch all routes accessible by the user based on their role.
@@ -42,8 +42,8 @@ class ROUTES {
         try {
             console.log("Fetching routes for UID:", req.user.uid);
     
-            // Get full user details from the database
-            const user = await UserData.findOne({ uid: req.user.uid });
+            // Get full admin details from admin_data
+            const user = await AdminData.findOne({ uid: req.user.uid });
             if (!user || !user.roles || user.roles.length === 0) {
                 return res.status(403).json({
                     success: false,

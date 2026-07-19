@@ -1,5 +1,4 @@
 const advance_info = require("../MODALS/advanceInfo");
-const UserData = require("../MODALS/userData");
 const validator = require("email-validator");
 const PhoneNumber = require('libphonenumber-js');
 
@@ -22,6 +21,23 @@ function generateString(length) {
     }
     return result;
 }
+// Fallback registration settings when advance_info is not seeded in DB
+const DEFAULT_REGISTRATION = {
+    user_gen_method: { value: 'manual' },
+    user_gen_prefix: { value: 'AGL' },
+    user_gen_digit: { value: 6 },
+    pass_gen_method: { value: 'manual' },
+    pass_gen_fun: { value: 'strong' },
+    pass_gen_digit: { value: 8 },
+    is_password_required: { value: 'yes' },
+};
+
+async function getRegistrationSettings() {
+    const doc = await advance_info.findOne().catch(() => null);
+    const reg = doc?.Registration || {};
+    return { ...DEFAULT_REGISTRATION, ...reg };
+}
+
 class FORM_VALIDATORS {
     async hashPassword(plaintextPassword) {
         const hash = await bcrypt.hash(plaintextPassword, 10);
@@ -30,7 +46,7 @@ class FORM_VALIDATORS {
     async generateUserName(userName) {
         try { 
             // console.log("1",userName);
-            const { Registration } = await advance_info.findOne();
+            const Registration = await getRegistrationSettings();
             const { user_gen_method, user_gen_prefix, user_gen_digit } = Registration;
             if (userName) {
                 if (user_gen_method.value === "automatic") {
@@ -56,17 +72,27 @@ class FORM_VALIDATORS {
             return{status:false, ...INTERNAL_SERVER_ERROR};
         }
     }
+
+    async generateAutomaticUserName(prefixOverride) {
+        try {
+            const Registration = await getRegistrationSettings();
+            const { user_gen_prefix, user_gen_digit } = Registration;
+            const prefix = prefixOverride || user_gen_prefix?.value || 'AGL';
+            const digits = Number(user_gen_digit?.value) || 6;
+            const min = 10 ** (digits - 1);
+            const max = 10 ** digits - 1;
+            const number = Math.floor(Math.random() * (max - min + 1)) + min;
+            return { status: true, userName: `${prefix}${number}` };
+        } catch (error) {
+            errorLogger(error);
+            return { status: false, ...INTERNAL_SERVER_ERROR };
+        }
+    }
     async isEmail(email) {
         try {
-            const { Registration } = await advance_info.findOne();
             const isEmail = await validator.validate(email);
             if (isEmail) {
-                const email_users = await UserData.find({ email }).count();
-                if (email_users < Registration.email_users.value) {
-                    return { status: true };
-                } else {
-                    return{status:false, ...EMAIL_ALREADY_EXISTS} ;
-                }
+                return { status: true };
             } else {
                 return{status:false, ...INVALID_EMAIL};;
             }
@@ -78,15 +104,7 @@ class FORM_VALIDATORS {
   
     async  isPanCard(pancard) {
         try {
-            
-    
-            const pancardCount = await UserData.find({ pancard }).count();
-    
-            if (pancardCount < 1) {
-                return { status: true };
-            } else {
-                return { status: false, ...PANCARD_ALREADY_EXISTS };
-            }
+            return { status: true };
         } catch (error) {
             errorLogger(error);
             return { status: false, ...INTERNAL_SERVER_ERROR };
@@ -96,13 +114,8 @@ class FORM_VALIDATORS {
     async isMobile(mobile, countryCode) {
         try {
             const phoneNumber = await PhoneNumber(mobile, countryCode); // Change the country code according to your needs
-            const { Registration } = await advance_info.findOne();
             console.log('phoneNumber', phoneNumber,mobile,countryCode)
             if (phoneNumber) {
-                const mobile_users = await UserData.find({ mobile }).count();
-                if (mobile_users >= Registration.mobile_users.value) {
-                    return{status:false, ...MOBILE_NUMBER_ALREADY_EXISTS};
-                }
                 return { status: true };
             } else {
                 return{status:false, ...INVALID_MOBILE_NUMBER}; 
@@ -114,42 +127,7 @@ class FORM_VALIDATORS {
     }
     async sponsor(sponsor) {
         try {
-            const { Registration } = await advance_info.findOne();
-            const { is_sponsor_active_required,is_sponsor_required } = Registration;
-            let sponsor_Data;
-            if (is_sponsor_required.value=='no') {
-               if (!sponsor) {
-                 const spo = await UserData.findOne({ uid: 1 });
-                 sponsor_Data=spo;
-               } else {
-                const spo = await UserData.findOne({ username: sponsor });
-                sponsor_Data=spo
-               }
-            }else{
-            const spo = await UserData.findOne({ username: sponsor });
-            sponsor_Data=spo
-            }
-            if (sponsor_Data) {
-                // Check how many users this sponsor has already referred
-                const referralCount = await UserData.countDocuments({ sponsor_Id: sponsor_Data.uid });
-                
-                // Limit: sponsor can refer only 2 person
-                if (referralCount >= 2) {
-                    return {status: false, ...SPONSOR_REFERRAL_LIMIT_REACHED};
-                }
-                
-                if (is_sponsor_active_required.value === "yes") {
-                    if (sponsor_Data.status === 1) {
-                        return { status: true, sponsor_Id: sponsor_Data.uid, name: sponsor_Data.name };
-                    } else {
-                        return {status:false,...SPONSOR_NOT_ACTIVE};
-                    }
-                } else {
-                    return { status: true, sponsor_Id: sponsor_Data.uid, name: sponsor_Data.name };
-                }
-            } else {
-                return{status:false, ...INVALID_SPONSOR}; 
-            }
+            return{status:false, ...INVALID_SPONSOR}; 
         } catch (error) {
             errorLogger(error)
             return{status:false, ...INTERNAL_SERVER_ERROR};
@@ -157,7 +135,7 @@ class FORM_VALIDATORS {
     }
     async generatePassword(password) {
         try {
-            const { Registration } = await advance_info.findOne();
+            const Registration = await getRegistrationSettings();
             const { pass_gen_method, pass_gen_fun, pass_gen_digit, is_password_required } = Registration;
 
             if (is_password_required.value === "yes") {

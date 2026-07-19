@@ -1,38 +1,49 @@
 /**
  * Basic DB seed for wellness panels (admin / franchise / distributor / theme)
  *
+ * Separate identity tables + separate wallets — NOT shared UserData roles.
+ *
  * Run:  node seed.js
  *   or: npm run seed
  *
- * Safe to re-run — skips records that already exist.
+ * Safe to re-run — skips / updates records that already exist.
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const UserData = require('./MODALS/userData');
+require('./MODALS/Counter');
+require('./MODALS/wallets');
+
+const AdminData = require('./MODALS/AdminData');
 const Franchise = require('./MODALS/Franchise');
 const Distributor = require('./MODALS/Distributor');
+const ThemeUser = require('./MODALS/ThemeUser');
+const AdminWallet = require('./MODALS/AdminWallet');
+const FranchiseWallet = require('./MODALS/FranchiseWallet');
+const DistributorWallet = require('./MODALS/DistributorWallet');
+const ThemeUserWallet = require('./MODALS/ThemeUserWallet');
 const Brand = require('./MODALS/Brand');
 const Category = require('./MODALS/Category');
 const Package = require('./MODALS/Package');
 const Product = require('./MODALS/Product');
 const Inventory = require('./MODALS/Inventory');
-const Notification = require('./MODALS/Notification');
+const PlansInfo = require('./MODALS/Plan');
 const { PermissionRoute } = require('./MODALS/Permission');
 const wellnessPermissionSeed = require('./SERVICES/WellnessPermissionSeed');
+const { ensurePanelWallet } = require('./utils/panelWallet');
+const { ensurePlanData } = PlansInfo;
 
+const Counter = mongoose.model('Counter');
 const DEFAULT_PASSWORD = 'Admin@123';
 
 const EXTRA_PERMISSIONS = [
-  // Admin auth + bootstrap
   { route: '/login', routeFor: 'admin', method: 'POST', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Admin login' },
   { route: '/seed-wellness-permissions', routeFor: 'admin', method: 'POST', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Bootstrap wellness permissions' },
 ];
 
 function buildUri() {
   const dbName = process.env.DB_NAME || 'wellness';
-  // Match connections.js local setup
   return `mongodb://localhost:27017/${dbName}`;
 }
 
@@ -47,48 +58,15 @@ async function upsertPermission(perm) {
   return 'created';
 }
 
-async function ensureUser({ uid, username, name, email, mobile, roles, user_type, sponsor_Id = 0 }) {
-  const existing = await UserData.findOne({ $or: [{ uid }, { username }] });
-  const password = await bcrypt.hash(DEFAULT_PASSWORD, 10);
-
-  if (existing) {
-    // Keep seed logins predictable for local/dev
-    await UserData.updateOne(
-      { _id: existing._id },
-      {
-        $set: {
-          password,
-          roles,
-          user_type,
-          status: 1,
-          blockStatus: 0,
-          lastActivity: new Date(),
-        },
-      }
-    );
-    const refreshed = await UserData.findById(existing._id);
-    return { user: refreshed, created: false, passwordReset: true };
+async function ensureCounter(ID, seq) {
+  const existing = await Counter.findOne({ ID });
+  if (!existing) {
+    await new Counter({ ID, seq }).save();
+    return;
   }
-
-  const validity = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-  const user = await new UserData({
-    uid,
-    username,
-    name,
-    email,
-    mobile,
-    password,
-    roles,
-    user_type,
-    status: 1,
-    sponsor_Id,
-    joining_date: new Date(),
-    lastActivity: new Date(),
-    id_card_validity: validity,
-    blockStatus: 0,
-  }).save();
-
-  return { user, created: true, passwordReset: false };
+  if (existing.seq < seq) {
+    await Counter.updateOne({ ID }, { $set: { seq } });
+  }
 }
 
 async function seedPermissions() {
@@ -112,33 +90,77 @@ async function seedPermissions() {
   };
 }
 
-async function seedUsers() {
-  const admin = await ensureUser({
-    uid: 1,
-    username: 'admin',
-    name: 'Super Admin',
-    email: 'admin@wellness.local',
-    mobile: '9000000001',
-    roles: ['admin'],
-    user_type: 'mlm',
-  });
+async function ensureAdmin() {
+  const password = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  let admin = await AdminData.findOne({ $or: [{ uid: 1 }, { username: 'admin' }] });
+  let created = false;
 
-  const franchiseUser = await ensureUser({
-    uid: 2,
-    username: 'franchise1',
-    name: 'Demo Franchise Owner',
-    email: 'franchise1@wellness.local',
-    mobile: '9000000002',
-    roles: ['franchise'],
-    user_type: 'franchise',
-    sponsor_Id: 1,
-  });
+  if (admin) {
+    await AdminData.updateOne(
+      { _id: admin._id },
+      {
+        $set: {
+          password,
+          roles: ['admin'],
+          status: 1,
+          blockStatus: 0,
+          name: 'Super Admin',
+          email: 'admin@wellness.local',
+          mobile: '9000000001',
+          lastActivity: new Date(),
+        },
+      }
+    );
+    admin = await AdminData.findById(admin._id);
+  } else {
+    admin = await new AdminData({
+      uid: 1,
+      username: 'admin',
+      password,
+      name: 'Super Admin',
+      email: 'admin@wellness.local',
+      mobile: '9000000001',
+      roles: ['admin'],
+      status: 1,
+      blockStatus: 0,
+      joining_date: new Date(),
+      lastActivity: new Date(),
+    }).save();
+    created = true;
+  }
 
-  let franchiseDoc = await Franchise.findOne({ uid: franchiseUser.user.uid });
-  let franchiseCreated = false;
-  if (!franchiseDoc) {
-    franchiseDoc = await new Franchise({
-      uid: franchiseUser.user.uid,
+  const wallet = await ensurePanelWallet(AdminWallet, admin.uid);
+  await ensureCounter('admin_uid', admin.uid);
+  return { admin, created, walletCreated: wallet.created };
+}
+
+async function ensureFranchise(adminUid) {
+  const password = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  let franchise = await Franchise.findOne({ $or: [{ uid: 1 }, { username: 'franchise1' }] });
+  let created = false;
+
+  if (franchise) {
+    await Franchise.updateOne(
+      { _id: franchise._id },
+      {
+        $set: {
+          password,
+          business_name: 'Demo Wellness Franchise',
+          owner_name: 'Demo Franchise Owner',
+          email: 'franchise1@wellness.local',
+          mobile: '9000000002',
+          status: 'active',
+          blockStatus: 0,
+          lastActivity: new Date(),
+        },
+      }
+    );
+    franchise = await Franchise.findById(franchise._id);
+  } else {
+    franchise = await new Franchise({
+      uid: 1,
+      username: 'franchise1',
+      password,
       business_name: 'Demo Wellness Franchise',
       owner_name: 'Demo Franchise Owner',
       email: 'franchise1@wellness.local',
@@ -154,32 +176,52 @@ async function seedUsers() {
       status: 'active',
       joining_date: new Date(),
       id_card_validity: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      created_by: 1,
+      created_by: adminUid,
+      lastActivity: new Date(),
     }).save();
-    franchiseCreated = true;
+    created = true;
   }
 
-  const distributorUser = await ensureUser({
-    uid: 3,
-    username: 'distributor1',
-    name: 'Demo Distributor',
-    email: 'distributor1@wellness.local',
-    mobile: '9000000003',
-    roles: ['distributor'],
-    user_type: 'distributor',
-    sponsor_Id: franchiseUser.user.uid,
-  });
+  const wallet = await ensurePanelWallet(FranchiseWallet, franchise.uid);
+  await ensureCounter('franchise_uid', franchise.uid);
+  return { franchise, created, walletCreated: wallet.created };
+}
 
-  let distributorDoc = await Distributor.findOne({ uid: distributorUser.user.uid });
-  let distributorCreated = false;
-  if (!distributorDoc) {
-    distributorDoc = await new Distributor({
-      uid: distributorUser.user.uid,
+async function ensureDistributor(franchise) {
+  const password = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  let distributor = await Distributor.findOne({ $or: [{ uid: 1 }, { username: 'distributor1' }] });
+  let created = false;
+
+  if (distributor) {
+    await Distributor.updateOne(
+      { _id: distributor._id },
+      {
+        $set: {
+          password,
+          name: 'Demo Distributor',
+          email: 'distributor1@wellness.local',
+          mobile: '9000000003',
+          sponsor_Id: franchise.uid,
+          sponsor_uid: franchise.uid,
+          sponsor_type: 'franchise',
+          status: 'active',
+          blockStatus: 0,
+          lastActivity: new Date(),
+        },
+      }
+    );
+    distributor = await Distributor.findById(distributor._id);
+  } else {
+    distributor = await new Distributor({
+      uid: 1,
+      username: 'distributor1',
+      password,
       name: 'Demo Distributor',
       email: 'distributor1@wellness.local',
       mobile: '9000000003',
-      sponsor_Id: franchiseUser.user.uid,
-      sponsor_uid: franchiseUser.user.uid,
+      sponsor_Id: franchise.uid,
+      sponsor_uid: franchise.uid,
+      sponsor_type: 'franchise',
       address: {
         line1: '45 Trade Road',
         city: 'Jaipur',
@@ -190,31 +232,128 @@ async function seedUsers() {
       status: 'active',
       joining_date: new Date(),
       id_card_validity: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      lastActivity: new Date(),
     }).save();
-    distributorCreated = true;
+    created = true;
   }
 
-  const themeUser = await ensureUser({
-    uid: 4,
-    username: 'theme1',
-    name: 'Demo Customer',
-    email: 'theme1@wellness.local',
-    mobile: '9000000004',
-    roles: ['theme'],
-    user_type: 'theme',
-    sponsor_Id: 0,
-  });
+  const wallet = await ensurePanelWallet(DistributorWallet, distributor.uid);
+  await ensureCounter('distributor_uid', distributor.uid);
+  return { distributor, created, walletCreated: wallet.created };
+}
 
-  return {
-    admin,
-    franchiseUser,
-    franchiseDoc,
-    franchiseCreated,
-    distributorUser,
-    distributorDoc,
-    distributorCreated,
-    themeUser,
-  };
+/**
+ * Sample left/right children under distributor1 so Binary Team is not empty.
+ */
+async function ensureBinaryDemoTeam(rootDistributor) {
+  const password = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  const rootUid = rootDistributor.uid;
+  const samples = [
+    {
+      uid: 2,
+      username: 'distributor2',
+      name: 'Demo Left',
+      email: 'distributor2@wellness.local',
+      mobile: '9000000004',
+      position: 'left',
+    },
+    {
+      uid: 3,
+      username: 'distributor3',
+      name: 'Demo Right',
+      email: 'distributor3@wellness.local',
+      mobile: '9000000005',
+      position: 'right',
+    },
+  ];
+
+  const results = [];
+  for (const sample of samples) {
+    let doc = await Distributor.findOne({ $or: [{ uid: sample.uid }, { username: sample.username }] });
+    let created = false;
+    const payload = {
+      password,
+      name: sample.name,
+      email: sample.email,
+      mobile: sample.mobile,
+      sponsor_Id: rootUid,
+      sponsor_uid: rootUid,
+      sponsor_type: 'distributor',
+      parent_Id: rootUid,
+      position: sample.position,
+      status: 'active',
+      blockStatus: 0,
+      lastActivity: new Date(),
+    };
+
+    if (doc) {
+      await Distributor.updateOne({ _id: doc._id }, { $set: payload });
+      doc = await Distributor.findById(doc._id);
+    } else {
+      doc = await new Distributor({
+        uid: sample.uid,
+        username: sample.username,
+        ...payload,
+        address: {
+          line1: 'Binary Demo Lane',
+          city: 'Jaipur',
+          state: 'Rajasthan',
+          pincode: '302002',
+          country: 'India',
+        },
+        joining_date: new Date(),
+        id_card_validity: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      }).save();
+      created = true;
+    }
+
+    const wallet = await ensurePanelWallet(DistributorWallet, doc.uid);
+    await ensureCounter('distributor_uid', doc.uid);
+    results.push({ distributor: doc, created, walletCreated: wallet.created });
+  }
+
+  return results;
+}
+
+async function ensureThemeUser() {
+  const password = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  let themeUser = await ThemeUser.findOne({ $or: [{ uid: 1 }, { username: 'theme1' }] });
+  let created = false;
+
+  if (themeUser) {
+    await ThemeUser.updateOne(
+      { _id: themeUser._id },
+      {
+        $set: {
+          password,
+          name: 'Demo Customer',
+          email: 'theme1@wellness.local',
+          mobile: '9000000004',
+          status: 1,
+          blockStatus: 0,
+          lastActivity: new Date(),
+        },
+      }
+    );
+    themeUser = await ThemeUser.findById(themeUser._id);
+  } else {
+    themeUser = await new ThemeUser({
+      uid: 1,
+      username: 'theme1',
+      password,
+      name: 'Demo Customer',
+      email: 'theme1@wellness.local',
+      mobile: '9000000004',
+      status: 1,
+      joining_date: new Date(),
+      lastActivity: new Date(),
+    }).save();
+    created = true;
+  }
+
+  const wallet = await ensurePanelWallet(ThemeUserWallet, themeUser.uid);
+  await ensureCounter('theme_uid', themeUser.uid);
+  return { themeUser, created, walletCreated: wallet.created };
 }
 
 async function seedCatalog(adminUid) {
@@ -250,6 +389,11 @@ async function seedCatalog(adminUid) {
     pkg = await new Package({
       name: 'Starter Pack',
       price: 1999,
+      amount: 2499,
+      discounted_amount: 1999,
+      bv: 1000,
+      pv: 1000,
+      items: [],
       description: 'Basic wellness starter package',
       benefits: ['Immunity support', 'Daily nutrition'],
       status: 'active',
@@ -280,6 +424,18 @@ async function seedCatalog(adminUid) {
       expiry_date: new Date(Date.now() + 540 * 24 * 60 * 60 * 1000),
     }).save();
     productCreated = true;
+  }
+
+  // Ensure starter package includes the demo product for activation purchase
+  if (product && (!pkg.items || pkg.items.length === 0)) {
+    pkg.items = [{ productId: product.productId, quantity: 1 }];
+    if (pkg.amount == null || pkg.amount === 0) pkg.amount = 2499;
+    if (pkg.discounted_amount == null || pkg.discounted_amount === 0) {
+      pkg.discounted_amount = pkg.price || 1999;
+    }
+    if (pkg.bv == null) pkg.bv = 1000;
+    if (pkg.pv == null) pkg.pv = 1000;
+    await pkg.save();
   }
 
   return {
@@ -320,98 +476,62 @@ async function seedInventory(franchiseDoc, product) {
   return { inventory, created: true };
 }
 
-async function seedNotifications(users) {
-  const samples = [
-    {
-      uid: users.franchiseUser.user.uid,
-      role: 'franchise',
-      title: 'Welcome Franchise',
-      message: 'Your franchise account is ready. Explore the dashboard.',
-    },
-    {
-      uid: users.distributorUser.user.uid,
-      role: 'distributor',
-      title: 'Welcome Distributor',
-      message: 'Your distributor account is ready. Start placing orders.',
-    },
-  ];
-
-  let created = 0;
-  let skipped = 0;
-
-  for (const item of samples) {
-    const exists = await Notification.findOne({
-      uid: item.uid,
-      role: item.role,
-      title: item.title,
-    });
-    if (exists) {
-      skipped += 1;
-      continue;
-    }
-
-    const payload = {
-      uid: item.uid,
-      role: item.role,
-      type: 'registration',
-      title: item.title,
-      message: item.message,
-      is_read: 0,
-      created_date: new Date(),
-    };
-
-    try {
-      await new Notification(payload).save();
-      created += 1;
-    } catch (err) {
-      skipped += 1;
-      console.warn(`Notification seed skipped: ${err.message}`);
-    }
-  }
-
-  return { created, skipped };
-}
-
 async function run() {
   const uri = buildUri();
   console.log(`Connecting: ${uri}`);
 
   await mongoose.connect(uri);
 
-  console.log('Connected. Seeding...\n');
+  console.log('Connected. Seeding separate panel tables...\n');
 
   const permissions = await seedPermissions();
   console.log('Permissions:', permissions);
 
-  const users = await seedUsers();
-  console.log('Users:');
-  console.log(`  admin        -> ${users.admin.created ? 'created' : 'exists'} (username: admin)`);
-  console.log(`  franchise1   -> ${users.franchiseUser.created ? 'created' : 'exists'}`);
-  console.log(`  franchiseDoc -> ${users.franchiseCreated ? 'created' : 'exists'} (id: ${users.franchiseDoc.franchiseId})`);
-  console.log(`  distributor1 -> ${users.distributorUser.created ? 'created' : 'exists'}`);
-  console.log(`  distributor  -> ${users.distributorCreated ? 'created' : 'exists'} (id: ${users.distributorDoc.distributorId})`);
-  console.log(`  theme1       -> ${users.themeUser.created ? 'created' : 'exists'}`);
+  const planData = await ensurePlanData();
+  console.log(
+    `plan_data         -> ${planData ? `ready (direct_income: ${planData.direct_income?.amount ?? 15}%)` : 'failed'}`
+  );
 
-  const catalog = await seedCatalog(users.admin.user.uid);
+  const adminResult = await ensureAdmin();
+  const franchiseResult = await ensureFranchise(adminResult.admin.uid);
+  const distributorResult = await ensureDistributor(franchiseResult.franchise);
+  const binaryTeam = await ensureBinaryDemoTeam(distributorResult.distributor);
+  const themeResult = await ensureThemeUser();
+
+  console.log('Identities (separate collections):');
+  console.log(`  admin_data         -> ${adminResult.created ? 'created' : 'exists'} (username: admin, uid: ${adminResult.admin.uid})`);
+  console.log(`  admin_wallets      -> ${adminResult.walletCreated ? 'created' : 'exists'}`);
+  console.log(`  franchise_data     -> ${franchiseResult.created ? 'created' : 'exists'} (username: franchise1, id: ${franchiseResult.franchise.franchiseId})`);
+  console.log(`  franchise_wallets  -> ${franchiseResult.walletCreated ? 'created' : 'exists'}`);
+  console.log(`  distributor_data   -> ${distributorResult.created ? 'created' : 'exists'} (username: distributor1, id: ${distributorResult.distributor.distributorId})`);
+  console.log(`  distributor_wallets -> ${distributorResult.walletCreated ? 'created' : 'exists'}`);
+  for (const row of binaryTeam) {
+    console.log(
+      `  binary child       -> ${row.created ? 'created' : 'exists'} (username: ${row.distributor.username}, ${row.distributor.position} of distributor1)`
+    );
+  }
+  console.log(`  theme_users_data   -> ${themeResult.created ? 'created' : 'exists'} (username: theme1, uid: ${themeResult.themeUser.uid})`);
+  console.log(`  theme_user_wallets -> ${themeResult.walletCreated ? 'created' : 'exists'}`);
+
+  const catalog = await seedCatalog(adminResult.admin.uid);
   console.log('Catalog:');
   console.log(`  brand    -> ${catalog.brandCreated ? 'created' : 'exists'} (${catalog.brand.name})`);
   console.log(`  category -> ${catalog.categoryCreated ? 'created' : 'exists'} (${catalog.category.name})`);
   console.log(`  package  -> ${catalog.packageCreated ? 'created' : 'exists'} (${catalog.package.name})`);
   console.log(`  product  -> ${catalog.productCreated ? 'created' : 'exists'} (${catalog.product.sku})`);
 
-  const inventory = await seedInventory(users.franchiseDoc, catalog.product);
+  const inventory = await seedInventory(franchiseResult.franchise, catalog.product);
   console.log(`Inventory -> ${inventory.created ? 'created' : 'exists'}`);
-
-  const notifications = await seedNotifications(users);
-  console.log('Notifications:', notifications);
 
   console.log('\n----------------------------------------');
   console.log('Login credentials (password for all):');
   console.log(`  ${DEFAULT_PASSWORD}`);
-  console.log('  admin         / Admin Panel');
-  console.log('  franchise1    / Franchise Panel');
-  console.log('  distributor1  / Distributor Panel');
-  console.log('  theme1        / Theme');
+  console.log('  admin         / Admin Panel      -> admin_data');
+  console.log('  franchise1    / Franchise Panel  -> franchise_data');
+  console.log('  distributor1  / Distributor Panel-> distributor_data');
+  console.log('  distributor2  / left of distributor1');
+  console.log('  distributor3  / right of distributor1');
+  console.log('  theme1        / Theme            -> theme_users_data');
   console.log('----------------------------------------\n');
 
   await mongoose.disconnect();

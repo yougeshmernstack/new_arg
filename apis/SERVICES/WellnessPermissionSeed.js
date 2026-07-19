@@ -1,6 +1,18 @@
 const { PermissionRoute } = require('../MODALS/Permission');
 const { errorLogger } = require('../utils/logger');
 
+const BUYER_STOREFRONT = (routeFor, role) => [
+    { route: '/get-products', routeFor, method: 'GET', roles: [role], menuMeta: { label: 'Products', icon: 'box', order: 10, showInMenu: true }, description: 'Browse products' },
+    { route: '/get-product', routeFor, method: 'GET', roles: [role], menuMeta: { showInMenu: false }, description: 'Product detail' },
+    { route: '/get-cart', routeFor, method: 'GET', roles: [role], menuMeta: { label: 'Cart', icon: 'cart', order: 11, showInMenu: true }, description: 'Get cart' },
+    { route: '/add-to-cart', routeFor, method: 'POST', roles: [role], menuMeta: { showInMenu: false }, description: 'Add to cart' },
+    { route: '/update-cart-item', routeFor, method: 'POST', roles: [role], menuMeta: { showInMenu: false }, description: 'Update cart item' },
+    { route: '/remove-cart-item', routeFor, method: 'POST', roles: [role], menuMeta: { showInMenu: false }, description: 'Remove cart item' },
+    { route: '/checkout', routeFor, method: 'POST', roles: [role], menuMeta: { showInMenu: false }, description: 'Checkout / place order' },
+    { route: '/get-orders', routeFor, method: 'GET', roles: [role], menuMeta: { label: 'Orders', icon: 'list', order: 12, showInMenu: true }, description: 'My orders' },
+    { route: '/get-order', routeFor, method: 'GET', roles: [role], menuMeta: { showInMenu: false }, description: 'Order detail' },
+];
+
 const WELLNESS_PERMISSIONS = [
     // Admin – franchise management & login-as
     { route: '/create-franchise', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { label: 'Create Franchise', showInMenu: false }, description: 'Admin creates franchise' },
@@ -11,12 +23,52 @@ const WELLNESS_PERMISSIONS = [
     { route: '/get-audit-logs', routeFor: 'admin', method: 'GET', roles: ['admin'], menuMeta: { label: 'Audit Logs', icon: 'list', order: 90, showInMenu: true }, description: 'Audit logs' },
     { route: '/wellness-dashboard', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { label: 'Wellness Dashboard', icon: 'dashboard', order: 1, showInMenu: true }, description: 'Wellness admin dashboard stats' },
 
+    // Admin – products & stock
+    { route: '/upload-product-media', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Upload product images/videos' },
+    { route: '/create-product', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Create product' },
+    { route: '/update-product', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Update product' },
+    { route: '/toggle-product-visibility', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Hide/show product' },
+    { route: '/update-product-stock', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Update product stock' },
+    { route: '/get-products', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { label: 'Products', icon: 'box', order: 30, showInMenu: true }, description: 'List products' },
+    { route: '/get-product', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { showInMenu: false }, description: 'Get product' },
+    { route: '/get-stock-history', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { label: 'Stock History', icon: 'history', order: 31, showInMenu: true }, description: 'Stock history' },
+    { route: '/get-low-stock-products', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { showInMenu: false }, description: 'Low stock products' },
+    { route: '/get-out-of-stock-products', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { showInMenu: false }, description: 'Out of stock products' },
+    { route: '/get-inventory', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { label: 'Inventory', icon: 'inventory', order: 32, showInMenu: true }, description: 'Inventory remaining vs delivered' },
+
+    // Admin – packages
+    { route: '/create-package', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Create activation package' },
+    { route: '/update-package', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Update activation package' },
+    { route: '/toggle-package-status', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Toggle package status' },
+    { route: '/get-packages', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { label: 'Packages', icon: 'package', order: 33, showInMenu: true }, description: 'List packages' },
+    { route: '/get-package', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { showInMenu: false }, description: 'Get package' },
+
+    // Admin – commerce orders
+    { route: '/get-commerce-orders', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { label: 'Orders', icon: 'orders', order: 40, showInMenu: true }, description: 'List commerce orders' },
+    { route: '/get-commerce-order', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { showInMenu: false }, description: 'Commerce order detail' },
+    { route: '/update-order-status', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Update order status' },
+    { route: '/update-order-shipping', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Update order shipping' },
+
+    // Admin – fund wallet payment settings & deposits
+    { route: '/get-payment-settings', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { label: 'Payment Settings', icon: 'wallet', order: 50, showInMenu: true }, description: 'Get company bank/UPI settings' },
+    { route: '/update-payment-settings', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Update company bank/UPI settings' },
+    { route: '/upload-payment-qr', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Upload UPI QR code' },
+    { route: '/get-fund-deposits', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { label: 'Fund Deposits', icon: 'wallet', order: 51, showInMenu: true }, description: 'List fund deposit requests' },
+    { route: '/approve-fund-deposit', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Approve fund deposit and credit wallet' },
+    { route: '/reject-fund-deposit', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Reject fund deposit request' },
+    { route: '/send-fund', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { label: 'Send Fund', icon: 'wallet', order: 52, showInMenu: true }, description: 'Admin credit fund wallet via add_fund activity' },
+    { route: '/get-send-fund-history', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { showInMenu: false }, description: 'Admin send fund credit history' },
+    { route: '/change-password', routeFor: 'admin', method: 'POST', roles: ['admin', 'manager'], menuMeta: { showInMenu: false }, description: 'Admin change password' },
+    { route: '/update-admin-password', routeFor: 'admin', method: 'POST', roles: ['admin', 'manager'], menuMeta: { showInMenu: false }, description: 'Admin change password (legacy)' },
+
     // Franchise
     { route: '/login', routeFor: 'franchise', method: 'POST', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Franchise login' },
     { route: '/get-dashboard', routeFor: 'franchise', method: 'GET', roles: ['franchise'], menuMeta: { label: 'Dashboard', icon: 'dashboard', order: 1, showInMenu: true }, description: 'Franchise dashboard' },
+    { route: '/get-inventory', routeFor: 'franchise', method: 'GET', roles: ['franchise'], menuMeta: { label: 'Inventory', icon: 'inventory', order: 2, showInMenu: true }, description: 'Franchise warehouse inventory' },
     { route: '/get-profile', routeFor: 'franchise', method: 'GET', roles: ['franchise'], menuMeta: { label: 'Profile', icon: 'user', order: 99, showInMenu: true }, description: 'Franchise profile' },
     { route: '/update-profile', routeFor: 'franchise', method: 'POST', roles: ['franchise'], menuMeta: { showInMenu: false }, description: 'Update franchise profile' },
-    { route: '/get-notifications', routeFor: 'franchise', method: 'GET', roles: ['franchise'], menuMeta: { label: 'Notifications', icon: 'bell', order: 80, showInMenu: true }, description: 'Franchise notifications' },
+    { route: '/change-password', routeFor: 'franchise', method: 'POST', roles: ['franchise'], menuMeta: { showInMenu: false }, description: 'Franchise change password' },
+    ...BUYER_STOREFRONT('franchise', 'franchise'),
 
     // Distributor
     { route: '/register', routeFor: 'distributor', method: 'POST', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Distributor registration with sponsor' },
@@ -24,15 +76,27 @@ const WELLNESS_PERMISSIONS = [
     { route: '/get-dashboard', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Dashboard', icon: 'dashboard', order: 1, showInMenu: true }, description: 'Distributor dashboard' },
     { route: '/get-profile', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Profile', icon: 'user', order: 99, showInMenu: true }, description: 'Distributor profile' },
     { route: '/update-profile', routeFor: 'distributor', method: 'POST', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Update distributor profile' },
-    { route: '/get-notifications', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Notifications', icon: 'bell', order: 80, showInMenu: true }, description: 'Distributor notifications' },
-
+    { route: '/change-password', routeFor: 'distributor', method: 'POST', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Distributor change password' },
+    { route: '/get-direct-team', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Direct Team', icon: 'users', order: 40, showInMenu: true }, description: 'Distributor direct team list' },
+    { route: '/get-generation-team', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Generation Team', icon: 'users', order: 41, showInMenu: true }, description: 'Distributor generation team list' },
+    { route: '/get-binary-legs', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Binary Legs', icon: 'users', order: 42, showInMenu: false }, description: 'Distributor left and right binary leg lists' },
+    { route: '/get-binary-tree', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Binary Tree', icon: 'users', order: 43, showInMenu: false }, description: 'Distributor binary tree view' },
+    { route: '/get-packages', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Packages', icon: 'package', order: 9, showInMenu: true }, description: 'Browse activation packages' },
+    { route: '/get-package', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Package detail' },
+    { route: '/purchase-package', routeFor: 'distributor', method: 'POST', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Purchase package and activate' },
+    { route: '/get-payment-methods', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Active company bank/UPI for deposits' },
+    { route: '/get-fund-wallet', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Fund Wallet', icon: 'wallet', order: 8, showInMenu: true }, description: 'Distributor fund wallet balance' },
+    { route: '/submit-fund-deposit', routeFor: 'distributor', method: 'POST', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Submit fund deposit with UTR' },
+    { route: '/get-fund-deposits', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Distributor fund deposit history' },
+    ...BUYER_STOREFRONT('distributor', 'distributor'),
     // Theme
     { route: '/register', routeFor: 'theme', method: 'POST', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Theme free registration' },
     { route: '/login', routeFor: 'theme', method: 'POST', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Theme login' },
     { route: '/get-dashboard', routeFor: 'theme', method: 'GET', roles: ['theme'], menuMeta: { label: 'Dashboard', icon: 'dashboard', order: 1, showInMenu: true }, description: 'Theme dashboard' },
     { route: '/get-profile', routeFor: 'theme', method: 'GET', roles: ['theme'], menuMeta: { label: 'Profile', icon: 'user', order: 99, showInMenu: true }, description: 'Theme profile' },
     { route: '/update-profile', routeFor: 'theme', method: 'POST', roles: ['theme'], menuMeta: { showInMenu: false }, description: 'Update theme profile' },
-    { route: '/get-notifications', routeFor: 'theme', method: 'GET', roles: ['theme'], menuMeta: { label: 'Notifications', icon: 'bell', order: 80, showInMenu: true }, description: 'Theme notifications' }
+    { route: '/change-password', routeFor: 'theme', method: 'POST', roles: ['theme'], menuMeta: { showInMenu: false }, description: 'Theme change password' },
+    ...BUYER_STOREFRONT('theme', 'theme')
 ];
 
 class WellnessPermissionSeed {
@@ -75,4 +139,7 @@ class WellnessPermissionSeed {
 }
 
 const wellnessPermissionSeed = new WellnessPermissionSeed();
-module.exports = wellnessPermissionSeed;
+module.exports = {
+    seed: (...args) => wellnessPermissionSeed.seed(...args),
+    run: (req, res) => wellnessPermissionSeed.run(req, res),
+};

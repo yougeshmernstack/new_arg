@@ -1,8 +1,14 @@
 const mongoose = require('mongoose');
 
+/**
+ * Franchise identity + business profile — collection: franchise_data
+ * Auth lives here (not in UserData).
+ */
 const franchiseSchema = new mongoose.Schema({
     franchiseId: { type: Number, unique: true },
     uid: { type: Number, required: true, unique: true },
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
     business_name: { type: String, required: true },
     owner_name: { type: String, required: true },
     email: { type: String, required: true },
@@ -19,11 +25,14 @@ const franchiseSchema = new mongoose.Schema({
     photo: { type: String, default: null },
     // active | inactive | disabled
     status: { type: String, enum: ['active', 'inactive', 'disabled'], default: 'active' },
+    blockStatus: { type: Number, default: 0 },
     joining_date: { type: Date, default: Date.now },
     id_card_validity: { type: Date, default: null },
-    created_by: { type: Number, default: null }
+    created_by: { type: Number, default: null },
+    lastActivity: { type: Date, default: null }
 }, {
-    timestamps: true
+    timestamps: true,
+    collection: 'franchise_data'
 });
 
 franchiseSchema.index({ status: 1 });

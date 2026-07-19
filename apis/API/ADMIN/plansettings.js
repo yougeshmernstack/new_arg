@@ -22,7 +22,9 @@ class PlanSetting {
 
             // Determine update path based on requested type
             let update = null;
-            if (type === 'direct_referral_bonus') {
+            if (type === 'direct_income') {
+                update = { $set: { 'direct_income.amount': income } };
+            } else if (type === 'direct_referral_bonus') {
                 update = { $set: { 'direct_referral_bonus.amount': income } };
             } else if (type === 'team_activity_bonus') {
                 update = { $set: { 'team_activity_bonus.amount': income } };
@@ -41,7 +43,7 @@ class PlanSetting {
             }
 
             if (!update) {
-                return res.status(400).json({ error: 'Unsupported type. Use one of: direct_referral_bonus, team_activity_bonus, instant_leadership_reward, daily_trading_profit, level_income, roi_level_income, roi_income' });
+                return res.status(400).json({ error: 'Unsupported type. Use one of: direct_income, direct_referral_bonus, team_activity_bonus, instant_leadership_reward, daily_trading_profit, level_income, roi_level_income, roi_income' });
             }
 
             const updatedPlanInfo = await PlansInfo.findOneAndUpdate(
