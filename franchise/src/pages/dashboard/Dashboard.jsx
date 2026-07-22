@@ -41,9 +41,10 @@ export default function Dashboard() {
     <div className="page">
       <div className="page-head">
         <div>
+          <p className="page-kicker">Overview</p>
           <h2>Franchise Dashboard</h2>
-          <p style={{ margin: '0.35rem 0 0', color: 'var(--muted)' }}>
-            {data?.franchise?.business_name || 'Franchise overview'}
+          <p className="page-sub">
+            {data?.franchise?.business_name || 'Live stock and desk activity at a glance'}
           </p>
         </div>
         <Link className="btn primary" to="/inventory">

@@ -106,6 +106,8 @@ const commerceOrderSchema = new mongoose.Schema({
     },
     // Set true once franchise Inventory has been credited on admin confirm
     franchise_stock_credited: { type: Boolean, default: false },
+    // Set true once distributor repurchase_bv was credited from this order
+    repurchase_bv_credited: { type: Boolean, default: false },
     created_date: { type: Date, default: Date.now }
 }, {
     timestamps: true

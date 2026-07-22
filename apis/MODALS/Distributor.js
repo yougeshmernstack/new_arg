@@ -41,6 +41,11 @@ const distributorSchema = new mongoose.Schema({
     match_bv: { type: Number, default: 0 },
     left_dummy_bv: { type: Number, default: 0 },
     right_dummy_bv: { type: Number, default: 0 },
+    // Repurchase matching (product BV) — no dummy
+    repurchase_bv: { type: Number, default: 0 },
+    left_repurchase_bv: { type: Number, default: 0 },
+    right_repurchase_bv: { type: Number, default: 0 },
+    match_repurchase_bv: { type: Number, default: 0 },
     joining_date: { type: Date, default: Date.now },
     id_card_validity: { type: Date, default: null },
     lastActivity: { type: Date, default: null }

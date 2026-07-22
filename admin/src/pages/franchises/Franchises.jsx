@@ -5,15 +5,23 @@ import { wellnessApi } from '../../api';
 const FRANCHISE_PANEL_URL =
   process.env.REACT_APP_FRANCHISE_PANEL_URL || 'http://localhost:3002';
 
+function statusTone(status) {
+  const value = String(status || '').toLowerCase();
+  if (value === 'active') return 'ok';
+  if (value === 'disabled' || value === 'inactive' || value === 'blocked') return 'danger';
+  return 'warn';
+}
+
 export default function Franchises() {
   const [list, setList] = useState([]);
   const [search, setSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loggingInUid, setLoggingInUid] = useState(null);
 
-  const load = async (q = search) => {
+  const load = async (q = appliedSearch) => {
     setLoading(true);
     setError('');
     try {
@@ -30,6 +38,18 @@ export default function Franchises() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const onSearch = (e) => {
+    e.preventDefault();
+    setAppliedSearch(search.trim());
+    load(search.trim());
+  };
+
+  const onClear = () => {
+    setSearch('');
+    setAppliedSearch('');
+    load('');
+  };
 
   const handleLoginAs = async (item) => {
     if (!item.uid) {
@@ -62,74 +82,107 @@ export default function Franchises() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>Franchises</h2>
+        <div>
+          <h2>Franchises</h2>
+          <p className="page-sub">Manage franchise partners, status, and panel access</p>
+        </div>
         <Link className="btn primary" to="/franchises/create">
           Create Franchise
         </Link>
       </div>
-      <form
-        className="toolbar"
-        onSubmit={(e) => {
-          e.preventDefault();
-          load();
-        }}
-      >
+
+      <form className="toolbar" onSubmit={onSearch}>
         <input
-          placeholder="Search business / owner / email / mobile"
+          placeholder="Search business, owner, email, or mobile"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search franchises"
         />
-        <button type="submit" className="btn">
+        <button type="submit" className="btn primary" disabled={loading}>
           Search
         </button>
+        {appliedSearch ? (
+          <button type="button" className="btn ghost" onClick={onClear}>
+            Clear
+          </button>
+        ) : null}
       </form>
+
       {error ? <div className="alert error">{error}</div> : null}
       {loginError ? <div className="alert error">{loginError}</div> : null}
-      {loading ? (
-        <p>Loading...</p>
+
+      <div className="list-meta">
+        <p>
+          {loading
+            ? 'Loading franchises...'
+            : `${list.length} franchise${list.length === 1 ? '' : 's'}${
+                appliedSearch ? ` for “${appliedSearch}”` : ''
+              }`}
+        </p>
+        <button type="button" className="btn ghost sm" onClick={() => load()} disabled={loading}>
+          Refresh
+        </button>
+      </div>
+
+      {loading && list.length === 0 ? (
+        <div className="table-wrap">
+          <div className="empty-state">Loading franchises...</div>
+        </div>
       ) : (
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Business</th>
-                <th>Owner</th>
-                <th>Email</th>
-                <th>Mobile</th>
-                <th>Status</th>
-                <th>Login</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.length === 0 ? (
+          {list.length === 0 ? (
+            <div className="empty-state">
+              <strong>No franchises found</strong>
+              {appliedSearch
+                ? 'Try a different search, or clear filters.'
+                : 'Create a franchise to get started.'}
+            </div>
+          ) : (
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={7}>No franchises found</td>
+                  <th>ID</th>
+                  <th>Business</th>
+                  <th>Owner</th>
+                  <th>Contact</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ) : (
-                list.map((item) => (
+              </thead>
+              <tbody>
+                {list.map((item) => (
                   <tr key={item._id || item.franchiseId}>
-                    <td>{item.franchiseId}</td>
-                    <td>{item.business_name}</td>
-                    <td>{item.owner_name}</td>
-                    <td>{item.email}</td>
-                    <td>{item.mobile}</td>
-                    <td>{item.status}</td>
+                    <td>
+                      <span className="cell-id">#{item.franchiseId}</span>
+                    </td>
+                    <td>
+                      <div className="cell-primary">{item.business_name || '—'}</div>
+                    </td>
+                    <td>{item.owner_name || '—'}</td>
+                    <td>
+                      <div>{item.email || '—'}</div>
+                      <div className="muted-cell">{item.mobile || '—'}</div>
+                    </td>
+                    <td>
+                      <span className={`badge ${statusTone(item.status)}`}>
+                        {item.status || 'unknown'}
+                      </span>
+                    </td>
                     <td>
                       <button
                         type="button"
-                        className="btn primary"
+                        className="btn primary sm"
                         disabled={loggingInUid === item.uid || item.status === 'disabled'}
                         onClick={() => handleLoginAs(item)}
                       >
-                        {loggingInUid === item.uid ? 'Opening...' : 'Login'}
+                        {loggingInUid === item.uid ? 'Opening...' : 'Login as'}
                       </button>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>

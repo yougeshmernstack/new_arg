@@ -23,6 +23,8 @@ const productSchema = new mongoose.Schema({
     mrp: { type: Number, required: true, default: 0 },
     distributor_price: { type: Number, required: true, default: 0 },
     franchise_price: { type: Number, required: true, default: 0 },
+    // Repurchase matching BV — credited on distributor product purchase
+    bv: { type: Number, default: 0 },
     stock: { type: Number, default: 0 },
     // Admin hide/show — hidden products are invisible to buyers
     is_hidden: { type: Boolean, default: false },

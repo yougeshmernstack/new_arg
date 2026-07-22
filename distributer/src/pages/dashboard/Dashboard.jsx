@@ -1,15 +1,269 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { distributorApi, storeApi } from '../../api';
+import { API_BASE_URL } from '../../utils/constants';
+
+const BANNER_WIDTH = 1200;
+const BANNER_HEIGHT = 360;
+const BANNER_INTERVAL_MS = 2000;
+
+function mediaUrl(path) {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+function DashboardBannerSlider({ banners }) {
+  const slides = Array.isArray(banners) ? banners : [];
+  const count = slides.length;
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [animate, setAnimate] = useState(true);
+  const trackRef = useRef(null);
+
+  useEffect(() => {
+    setIndex(0);
+    setAnimate(true);
+  }, [count]);
+
+  const goNext = () => {
+    if (count <= 1) return;
+    setAnimate(true);
+    setIndex((prev) => (prev >= count ? prev : prev + 1));
+  };
+
+  const goPrev = () => {
+    if (count <= 1) return;
+    setAnimate(true);
+    setIndex((prev) => (prev < 0 ? prev : prev - 1));
+  };
+
+  const goTo = (target) => {
+    if (count <= 1) return;
+    setAnimate(true);
+    setIndex(target);
+  };
+
+  useEffect(() => {
+    if (count <= 1 || paused) return undefined;
+    const timer = window.setInterval(() => {
+      setAnimate(true);
+      setIndex((prev) => (prev >= count ? prev : prev + 1));
+    }, BANNER_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [count, paused]);
+
+  useEffect(() => {
+    if (count <= 1) return undefined;
+    const track = trackRef.current;
+    if (!track) return undefined;
+
+    const onEnd = (event) => {
+      if (event.target !== track) return;
+      if (index >= count) {
+        setAnimate(false);
+        setIndex(0);
+      } else if (index < 0) {
+        setAnimate(false);
+        setIndex(count - 1);
+      }
+    };
+
+    track.addEventListener('transitionend', onEnd);
+    return () => track.removeEventListener('transitionend', onEnd);
+  }, [index, count]);
+
+  useEffect(() => {
+    if (animate) return undefined;
+    const id = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setAnimate(true));
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [animate, index]);
+
+  if (count === 0) {
+    return (
+      <div className="dash-banner-slot dash-banner-empty" aria-label="No banners">
+        <div className="dash-banner-empty-inner">
+          <strong>Welcome back</strong>
+          <span>Promotions and updates will appear here</span>
+        </div>
+      </div>
+    );
+  }
+
+  const visualIndex = ((index % count) + count) % count;
+  // Seamless loop: [last, ...slides, first]
+  const loopSlides =
+    count > 1
+      ? [slides[count - 1], ...slides, slides[0]]
+      : slides;
+  const trackIndex = count > 1 ? index + 1 : 0;
+
+  const renderSlide = (slide, key) => {
+    const isExternal = /^https?:\/\//i.test(slide.linkUrl || '');
+    const image = (
+      <img
+        src={mediaUrl(slide.imageUrl)}
+        alt={slide.title || 'Banner'}
+        width={BANNER_WIDTH}
+        height={BANNER_HEIGHT}
+        draggable={false}
+      />
+    );
+
+    let media = image;
+    if (slide.linkUrl) {
+      media = isExternal ? (
+        <a className="dash-banner-link" href={slide.linkUrl} target="_blank" rel="noreferrer">
+          {image}
+        </a>
+      ) : (
+        <Link className="dash-banner-link" to={slide.linkUrl}>
+          {image}
+        </Link>
+      );
+    }
+
+    return (
+      <div className="dash-banner-slide" key={key}>
+        {media}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className="dash-banner-slot"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <div className="dash-banner-frame">
+        <div
+          ref={trackRef}
+          className={`dash-banner-track${animate ? ' is-animated' : ''}`}
+          style={{ transform: `translate3d(-${trackIndex * 100}%, 0, 0)` }}
+        >
+          {count > 1
+            ? loopSlides.map((slide, i) => renderSlide(slide, `${slide.bannerId || 'b'}-${i}`))
+            : renderSlide(slides[0], slides[0].bannerId || 'solo')}
+        </div>
+
+        {count > 1 ? (
+          <>
+            <button
+              type="button"
+              className="dash-banner-nav prev"
+              aria-label="Previous banner"
+              onClick={goPrev}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="dash-banner-nav next"
+              aria-label="Next banner"
+              onClick={goNext}
+            >
+              ›
+            </button>
+            <div className="dash-banner-dots" role="tablist" aria-label="Banner slides">
+              {slides.map((slide, i) => (
+                <button
+                  key={slide.bannerId || i}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === visualIndex}
+                  className={`dash-banner-dot${i === visualIndex ? ' is-active' : ''}`}
+                  onClick={() => goTo(i)}
+                  aria-label={`Go to banner ${i + 1}`}
+                />
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function MetricIcon({ type }) {
   const paths = {
-    orders: <><path d="M9 5h6" /><path d="M8 5v2h8V5" /><path d="M7 7h10v14a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V7z" /><path d="M10 12h4" /><path d="M10 16h4" /></>,
-    revenue: <><circle cx="12" cy="12" r="9" /><path d="M8 8h5a2 2 0 0 1 0 4H9l6 5" /><path d="M8 12h7" /></>,
-    alerts: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></>,
-    customers: <><path d="M16 21v-2a4 4 0 0 0-8 0v2" /><circle cx="12" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M2 21v-2a4 4 0 0 1 3-3.87" /></>,
-    income: <><path d="M6 3h12" /><path d="M6 8h12" /><path d="M6 13h3" /><path d="M9 13c6.667 0 6.667-10 0-10" /><path d="m6 13 8.5 8" /></>,
+    income: (
+      <>
+        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+        <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+        <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+      </>
+    ),
+    revenue: (
+      <>
+        <path d="M3 3v18h18" />
+        <path d="M7 14l4-4 4 3 5-6" />
+      </>
+    ),
+    orders: (
+      <>
+        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+        <path d="M3 6h18" />
+        <path d="M16 10a4 4 0 0 1-8 0" />
+      </>
+    ),
+    customers: (
+      <>
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </>
+    ),
+    wallet: (
+      <>
+        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+        <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+        <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+      </>
+    ),
+    bag: (
+      <>
+        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+        <path d="M3 6h18" />
+        <path d="M16 10a4 4 0 0 1-8 0" />
+      </>
+    ),
+    list: (
+      <>
+        <path d="M8 6h13" />
+        <path d="M8 12h13" />
+        <path d="M8 18h13" />
+        <path d="M3 6h.01" />
+        <path d="M3 12h.01" />
+        <path d="M3 18h.01" />
+      </>
+    ),
+    megaphone: (
+      <>
+        <path d="m3 11 18-5v12L3 13v-2z" />
+        <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+      </>
+    ),
+    leaf: (
+      <>
+        <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+        <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+      </>
+    ),
+    tree: (
+      <>
+        <circle cx="12" cy="5" r="2.2" />
+        <circle cx="7" cy="14" r="2.2" />
+        <circle cx="17" cy="14" r="2.2" />
+        <path d="M12 7.2v2.6M10.2 12.2 8.4 12.8M13.8 12.2l1.8.6" />
+      </>
+    ),
+    arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
   };
+
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {paths[type]}
@@ -26,14 +280,12 @@ function formatInr(value, fractionDigits = 0) {
   });
 }
 
-const chartBars = [34, 58, 46, 72, 52, 88, 64, 76, 48, 67, 39, 58];
-
-// Set true later to bring Sales Analytic back
-const SHOW_SALES_ANALYTIC = false;
+const INCOME_COLORS = ['#0f3d2e', '#1a5c40', '#2d8a5e', '#4caf50', '#7cb342', '#a8d08d', '#c9a227'];
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
+  const [banners, setBanners] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -41,13 +293,15 @@ export default function Dashboard() {
     let active = true;
     (async () => {
       try {
-        const [dashRes, ordersRes] = await Promise.all([
+        const [dashRes, ordersRes, bannersRes] = await Promise.all([
           distributorApi.getDashboard(),
           storeApi.getOrders({ limit: 5 }),
+          distributorApi.getDashboardBanners().catch(() => ({ data: { data: [] } })),
         ]);
         if (!active) return;
         setData(dashRes.data?.data || null);
         setRecentOrders(ordersRes.data?.data || []);
+        setBanners(bannersRes.data?.data || []);
       } catch (err) {
         if (active) setError(err.response?.data?.message || 'Failed to load dashboard');
       } finally {
@@ -58,6 +312,27 @@ export default function Dashboard() {
       active = false;
     };
   }, []);
+
+  const income = data?.income || { total: 0, items: [] };
+  const incomeItems = useMemo(
+    () => (Array.isArray(income.items) ? income.items : []),
+    [income.items],
+  );
+
+  const chartStyle = useMemo(() => {
+    const total = incomeItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    if (!total || incomeItems.length === 0) {
+      return { background: 'conic-gradient(#e8f0ea 0 100%)' };
+    }
+    let cursor = 0;
+    const stops = incomeItems.map((item, index) => {
+      const pct = (Number(item.amount || 0) / total) * 100;
+      const start = cursor;
+      cursor += pct;
+      return `${INCOME_COLORS[index % INCOME_COLORS.length]} ${start}% ${cursor}%`;
+    });
+    return { background: `conic-gradient(${stops.join(', ')})` };
+  }, [incomeItems]);
 
   if (loading) {
     return (
@@ -71,12 +346,7 @@ export default function Dashboard() {
     return <div className="alert alert-danger mb-0">{error}</div>;
   }
 
-  const amount = Number(data?.orders?.total_amount ?? 0);
-  const orderCount = data?.orders?.total_orders ?? 0;
-  const unread = data?.unreadNotifications ?? 0;
   const team = data?.team || {};
-  const income = data?.income || { total: 0, items: [] };
-  const incomeItems = Array.isArray(income.items) ? income.items : [];
   const incomeTotal = Number(income.total || 0);
   const totalTeam = Number(team.totalTeam || 0);
   const activeTeam = Number(team.activeTeam || 0);
@@ -90,256 +360,360 @@ export default function Dashboard() {
   const rightTeam = Number(team.rightTeam || 0);
   const rightActive = Number(team.rightActive || 0);
   const rightInactive = Number(team.rightInactive || 0);
-  const formattedAmount = formatInr(amount);
   const formattedIncome = formatInr(incomeTotal, 2);
   const binary = data?.binary || {};
   const leftBv = Number(binary.left_bv || 0);
   const rightBv = Number(binary.right_bv || 0);
-  const matchBv = Number(binary.match_bv || 0);
+  const matchBv = Number(binary.match_bv || binary.matched_bv || 0);
+  const closedBv = Number(binary.closed_bv || 0);
   const leftDummyBv = Number(binary.left_dummy_bv || 0);
   const rightDummyBv = Number(binary.right_dummy_bv || 0);
+  const repurchase = data?.repurchase || {};
+  const repurchaseLeftBv = Number(repurchase.left_bv || 0);
+  const repurchaseRightBv = Number(repurchase.right_bv || 0);
+  const repurchaseMatchBv = Number(repurchase.match_bv || 0);
 
-  const cards = [
-    { label: 'Total Revenue', value: formattedAmount, note: 'All time business', icon: 'revenue', trend: '+11%' },
-    { label: 'Total Income', value: formattedIncome, note: `${incomeItems.length} income type${incomeItems.length === 1 ? '' : 's'}`, icon: 'income', trend: null },
-    { label: 'Total Orders', value: orderCount, note: 'Confirmed orders', icon: 'orders', trend: '+8%' },
-    { label: 'Total Team', value: totalTeam, note: `${activeTeam} active · ${inactiveTeam} inactive`, icon: 'customers', trend: null },
+  const quickActions = [
+    { to: '/fund-wallet', label: 'Add Funds', icon: 'wallet', tone: 'green' },
+    { to: '/products', label: 'Shop Products', icon: 'bag', tone: 'mint' },
+    { to: '/orders', label: 'My Orders', icon: 'list', tone: 'gold' },
+    { to: '/packages', label: 'Packages', icon: 'megaphone', tone: 'violet' },
   ];
 
   return (
-    <div className="container-fluid px-0 commerce-dashboard">
-      <div className="row g-2 g-md-3 mb-3">
-        {cards.map((card) => (
-          <div className="col-6 col-xl-3" key={card.label}>
-            <div className="card commerce-stat-card h-100 border-0 shadow-sm">
-              <div className="card-body d-flex align-items-start justify-content-between gap-2 p-3">
-                <div className="metric-copy flex-grow-1 min-w-0">
-                  <span className="d-block text-muted small">{card.label}</span>
-                  <strong className="d-block text-truncate">{card.value}</strong>
-                  <small className="d-block text-muted">
-                    {card.note}
-                    {card.trend ? (
-                      <>
-                        {' '}
-                        <b className="trend-up">{card.trend}</b>
-                      </>
-                    ) : null}
-                  </small>
-                </div>
-                <div className={`metric-icon ${card.icon} flex-shrink-0`}>
-                  <MetricIcon type={card.icon} />
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+    <div className="container-fluid px-0 dash-pro">
+      <div className="dash-banner-wrap mb-3">
+        <DashboardBannerSlider banners={banners} />
       </div>
 
-      <div className="row g-2 g-md-3 mb-3">
-        <div className="col-12">
-          <div className="card commerce-card binary-bv-card border-0 shadow-sm">
-            <div className="card-body">
-              <div className="mb-3 d-flex justify-content-between align-items-start gap-2">
-                <div>
-                  <h3 className="h6 mb-1">Binary BV</h3>
-                  <p className="text-muted small mb-0">Left, right, match and dummy volume</p>
-                </div>
-                <Link to="/team/binary" className="soft-pill text-decoration-none">View binary tree</Link>
+      <div className="row g-3 mb-3">
+        <div className="col-12 col-xl-7">
+          <div className="dash-panel dash-income-panel h-100">
+            <div className="dash-panel-head">
+              <div>
+                <h3>Income Overview</h3>
+                <p>Earnings by income type</p>
               </div>
-
-              <div className="binary-bv-grid">
-                <div className="binary-bv-metric left">
-                  <span>Left BV</span>
-                  <strong>{formatInr(leftBv, 2)}</strong>
-                  <small>Team volume</small>
-                </div>
-                <div className="binary-bv-metric match">
-                  <span>Match BV</span>
-                  <strong>{formatInr(matchBv, 2)}</strong>
-                  <small>Pairable volume</small>
-                </div>
-                <div className="binary-bv-metric right">
-                  <span>Right BV</span>
-                  <strong>{formatInr(rightBv, 2)}</strong>
-                  <small>Team volume</small>
-                </div>
-              </div>
-
-              <div className="binary-bv-dummy-grid">
-                <div className="binary-bv-dummy-item">
-                  <span>Left Dummy BV</span>
-                  <strong>{formatInr(leftDummyBv, 2)}</strong>
-                </div>
-                <div className="binary-bv-dummy-item">
-                  <span>Right Dummy BV</span>
-                  <strong>{formatInr(rightDummyBv, 2)}</strong>
-                </div>
-              </div>
+              <span className="dash-chip">{incomeItems.length} active</span>
             </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="row g-2 g-md-3">
-        {/* Sales Analytic — hidden for now; unhide via SHOW_SALES_ANALYTIC when needed */}
-        {SHOW_SALES_ANALYTIC ? (
-          <div className="col-12 col-lg-8">
-            <div className="card commerce-card border-0 shadow-sm h-100">
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-start gap-2 mb-3">
+            <div className="dash-income-layout">
+              <div className="dash-income-main">
+                <div className="dash-income-hero">
                   <div>
-                    <h3 className="h6 mb-1">Sales Analytic</h3>
-                    <p className="text-muted small mb-0">Revenue and order activity</p>
+                    <span>Total Income</span>
+                    <strong>{formattedIncome}</strong>
                   </div>
-                  <span className="soft-pill">30 days</span>
-                </div>
-                <div className="row g-2 mb-3">
-                  <div className="col-12 col-sm-4">
-                    <div className="sales-pill">
-                      <small>Income</small>
-                      <strong>{formattedIncome}</strong>
-                    </div>
-                  </div>
-                  <div className="col-12 col-sm-4">
-                    <div className="sales-pill">
-                      <small>Orders</small>
-                      <strong>{orderCount}</strong>
-                    </div>
-                  </div>
-                  <div className="col-12 col-sm-4">
-                    <div className="sales-pill">
-                      <small>Updates</small>
-                      <strong>{unread}</strong>
-                    </div>
+                  <div className="dash-income-hero-icon" aria-hidden="true">
+                    <MetricIcon type="leaf" />
                   </div>
                 </div>
-                <div className="bar-chart" aria-label="Sales chart">
-                  {chartBars.map((height, index) => (
-                    <span key={index} style={{ '--bar-height': `${height}%` }} />
+
+                <div className="dash-income-list">
+                  {incomeItems.length === 0 ? (
+                    <div className="dash-empty-inline">No income types configured yet</div>
+                  ) : (
+                    incomeItems.map((item, index) => (
+                      <Link
+                        className="dash-income-row dash-income-row-link"
+                        key={item.key || item.label}
+                        to={`/income/${encodeURIComponent(item.key)}`}
+                      >
+                        <div className="dash-income-row-left">
+                          <span
+                            className="dash-income-dot"
+                            style={{ background: INCOME_COLORS[index % INCOME_COLORS.length] }}
+                          />
+                          <div>
+                            <strong>{item.label}</strong>
+                            <small>
+                              {item.count > 0
+                                ? `${item.count} credit${item.count === 1 ? '' : 's'}`
+                                : 'No credits yet'}
+                            </small>
+                          </div>
+                        </div>
+                        <b>{formatInr(item.amount, 2)}</b>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="dash-income-chart-wrap">
+                <div className="dash-donut" style={chartStyle} aria-label="Income distribution">
+                  <div className="dash-donut-hole">
+                    <strong>{incomeItems.length || 0}</strong>
+                    <span>Types</span>
+                  </div>
+                </div>
+                <p className="dash-donut-caption">Income Distribution</p>
+                <div className="dash-donut-legend">
+                  {incomeItems.slice(0, 4).map((item, index) => (
+                    <span key={item.key || item.label}>
+                      <i style={{ background: INCOME_COLORS[index % INCOME_COLORS.length] }} />
+                      {item.label}
+                    </span>
                   ))}
                 </div>
               </div>
             </div>
           </div>
-        ) : null}
+        </div>
 
-        <div className={SHOW_SALES_ANALYTIC ? 'col-12 col-lg-4' : 'col-12 col-lg-8'}>
-          <div className="card commerce-card income-overview-card border-0 shadow-sm h-100">
-            <div className="card-body">
-              <div className="mb-3 d-flex justify-content-between align-items-start gap-2">
-                <div>
-                  <h3 className="h6 mb-1">Income Overview</h3>
-                  <p className="text-muted small mb-0">Earnings by income type</p>
-                </div>
-                <span className="soft-pill">{incomeItems.length} active</span>
+        <div className="col-12 col-xl-5">
+          <div className="dash-panel dash-team-panel h-100">
+            <div className="dash-panel-head">
+              <div>
+                <h3>Team Overview</h3>
+                <p>Live downline counts</p>
               </div>
+              <Link to="/team/generation" className="dash-chip dash-chip-link">
+                View team
+              </Link>
+            </div>
 
-              <div className="income-hero">
-                <div>
-                  <span>Total income</span>
-                  <strong>{formattedIncome}</strong>
+            <div className="dash-team-hero">
+              <div className="dash-team-hero-copy">
+                <span>Total Team</span>
+                <strong>{totalTeam}</strong>
+              </div>
+              <div className="dash-team-hero-side">
+                <div className="dash-team-pills">
+                  <em className="is-active">{activeTeam} Active</em>
+                  <em className="is-inactive">{inactiveTeam} Inactive</em>
                 </div>
-                <div className="income-hero-icon" aria-hidden="true">
-                  <MetricIcon type="income" />
+                <div className="dash-team-hero-icon" aria-hidden="true">
+                  <MetricIcon type="customers" />
                 </div>
               </div>
+            </div>
 
-              <div className="income-type-list">
-                {incomeItems.length === 0 ? (
-                  <div className="income-type-empty text-muted">No income types configured</div>
-                ) : (
-                  incomeItems.map((item) => (
-                    <div className="income-type-row" key={item.key}>
-                      <div className="income-type-copy">
-                        <span>{item.label}</span>
-                        <small>
-                          {item.count > 0
-                            ? `${item.count} credit${item.count === 1 ? '' : 's'}`
-                            : 'No credits yet'}
-                        </small>
-                      </div>
-                      <strong>{formatInr(item.amount, 2)}</strong>
-                    </div>
-                  ))
-                )}
+            <div className="dash-team-legs">
+              <Link to="/team/left" className="dash-team-leg left">
+                <span>Left Team</span>
+                <strong>{leftTeam}</strong>
+                <div className="dash-team-leg-meta">
+                  <em>{leftActive} active</em>
+                  <em>{leftInactive} inactive</em>
+                </div>
+              </Link>
+              <Link to="/team/right" className="dash-team-leg right">
+                <span>Right Team</span>
+                <strong>{rightTeam}</strong>
+                <div className="dash-team-leg-meta">
+                  <em>{rightActive} active</em>
+                  <em>{rightInactive} inactive</em>
+                </div>
+              </Link>
+            </div>
+
+            <div className="dash-team-mini">
+              <div className="dash-team-mini-item">
+                <span>Direct</span>
+                <b>{directTeam}</b>
+                <small>
+                  {directActive}A / {directInactive}I
+                </small>
+              </div>
+              <div className="dash-team-mini-item">
+                <span>Active</span>
+                <b>{activeTeam}</b>
+                <small>Full team</small>
+              </div>
+              <div className="dash-team-mini-item">
+                <span>Inactive</span>
+                <b>{inactiveTeam}</b>
+                <small>Full team</small>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="col-12 col-lg-4">
-          <div className="card commerce-card team-overview-card border-0 shadow-sm h-100">
-            <div className="card-body">
-              <div className="mb-3 d-flex justify-content-between align-items-start gap-2">
-                <div>
-                  <h3 className="h6 mb-1">Team Overview</h3>
-                  <p className="text-muted small mb-0">Live downline counts</p>
-                </div>
-                <Link to="/team/generation" className="soft-pill text-decoration-none">View team</Link>
-              </div>
-
-              <div className="team-hero">
-                <div>
-                  <span>Total team</span>
-                  <strong>{totalTeam}</strong>
-                </div>
-                <div className="team-hero-split">
-                  <em>{activeTeam} active</em>
-                  <em>{inactiveTeam} inactive</em>
-                </div>
-              </div>
-
-              <div className="team-legs">
-                <Link to="/team/left" className="team-leg left">
-                  <span className="team-leg-label">Left team</span>
-                  <strong>{leftTeam}</strong>
-                  <div className="team-leg-meta">
-                    <em>{leftActive} active</em>
-                    <em>{leftInactive} inactive</em>
-                  </div>
-                </Link>
-                <Link to="/team/right" className="team-leg right">
-                  <span className="team-leg-label">Right team</span>
-                  <strong>{rightTeam}</strong>
-                  <div className="team-leg-meta">
-                    <em>{rightActive} active</em>
-                    <em>{rightInactive} inactive</em>
-                  </div>
-                </Link>
-              </div>
-
-              <div className="team-mini-stats">
-                <div>
-                  <span>Direct</span>
-                  <b>{directTeam}</b>
-                  <small>{directActive}A / {directInactive}I</small>
-                </div>
-                <div>
-                  <span>Active</span>
-                  <b>{activeTeam}</b>
-                  <small>Full team</small>
-                </div>
-                <div>
-                  <span>Inactive</span>
-                  <b>{inactiveTeam}</b>
-                  <small>Full team</small>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <div className="row g-3 mb-3">
         <div className="col-12">
-          <div className="card commerce-card border-0 shadow-sm h-100">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-start gap-2 mb-3">
-                <div>
-                  <h3 className="h6 mb-1">Recent Orders</h3>
-                  <p className="text-muted small mb-0">Latest ecommerce order activity</p>
-                </div>
-                <Link to="/orders" className="soft-pill text-decoration-none">View all</Link>
+          <div className="dash-panel dash-bv-panel">
+            <div className="dash-panel-head">
+              <div>
+                <h3>Binary BV</h3>
+                <p>Package purchase volume — left, right, match and dummy</p>
               </div>
+              <Link to="/team/binary" className="dash-chip dash-chip-link dash-bv-link">
+                <MetricIcon type="tree" />
+                View binary tree
+              </Link>
+            </div>
 
+            <div className="dash-bv-hero">
+              <div className="dash-bv-hero-copy">
+                <span>Match BV</span>
+                <strong>{formatInr(matchBv, 2)}</strong>
+                <small>Updates after binary matching closing</small>
+              </div>
+              <div className="dash-bv-hero-side">
+                <div className="dash-bv-hero-stats">
+                  <em title="Total BV deducted across all closings">
+                    <b>Closed</b>
+                    {formatInr(closedBv, 0)}
+                  </em>
+                  <em title="Total BV matched so far">
+                    <b>Matched</b>
+                    {formatInr(matchBv, 0)}
+                  </em>
+                </div>
+                <div className="dash-bv-hero-icon" aria-hidden="true">
+                  <MetricIcon type="tree" />
+                </div>
+              </div>
+            </div>
+
+            <div className="dash-bv-balance" aria-hidden="true">
+              <div
+                className="dash-bv-balance-left"
+                style={{
+                  flexGrow: Math.max(leftBv, 0.01),
+                }}
+              />
+              <div
+                className="dash-bv-balance-right"
+                style={{
+                  flexGrow: Math.max(rightBv, 0.01),
+                }}
+              />
+            </div>
+
+            <div className="dash-bv-grid">
+              <div className="dash-bv-metric left">
+                <div className="dash-bv-metric-top">
+                  <span>Left BV</span>
+                  <i className="dash-bv-metric-badge" aria-hidden="true">
+                    L
+                  </i>
+                </div>
+                <strong>{formatInr(leftBv, 2)}</strong>
+                <small>Team volume</small>
+              </div>
+              <div className="dash-bv-metric right">
+                <div className="dash-bv-metric-top">
+                  <span>Right BV</span>
+                  <i className="dash-bv-metric-badge" aria-hidden="true">
+                    R
+                  </i>
+                </div>
+                <strong>{formatInr(rightBv, 2)}</strong>
+                <small>Team volume</small>
+              </div>
+              <div className="dash-bv-metric dummy left">
+                <div className="dash-bv-metric-top">
+                  <span>Left Dummy</span>
+                  <i className="dash-bv-metric-badge" aria-hidden="true">
+                    LD
+                  </i>
+                </div>
+                <strong>{formatInr(leftDummyBv, 2)}</strong>
+                <small>Carry forward</small>
+              </div>
+              <div className="dash-bv-metric dummy right">
+                <div className="dash-bv-metric-top">
+                  <span>Right Dummy</span>
+                  <i className="dash-bv-metric-badge" aria-hidden="true">
+                    RD
+                  </i>
+                </div>
+                <strong>{formatInr(rightDummyBv, 2)}</strong>
+                <small>Carry forward</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="row g-3 mb-3">
+        <div className="col-12">
+          <div className="dash-panel dash-rp-panel">
+            <div className="dash-rp-head">
+              <div className="dash-rp-head-copy">
+                <span className="dash-rp-tag">
+                  <MetricIcon type="bag" />
+                  Product BV
+                </span>
+                <h3>Repurchase Matching</h3>
+                <p>Left &amp; right product volume — match closes separately (no dummy)</p>
+              </div>
+              <div className="dash-rp-match-pill" title="Pairable repurchase match BV">
+                <span>Match</span>
+                <strong>{formatInr(repurchaseMatchBv, 2)}</strong>
+              </div>
+            </div>
+
+            <div className="dash-rp-track" aria-hidden="true">
+              <div
+                className="dash-rp-track-left"
+                style={{ flexGrow: Math.max(repurchaseLeftBv, 0.01) }}
+              />
+              <div className="dash-rp-track-mid" />
+              <div
+                className="dash-rp-track-right"
+                style={{ flexGrow: Math.max(repurchaseRightBv, 0.01) }}
+              />
+            </div>
+
+            <div className="dash-rp-legs">
+              <div className="dash-rp-leg dash-rp-leg-left">
+                <div className="dash-rp-leg-label">
+                  <i aria-hidden="true">L</i>
+                  <span>Left BV</span>
+                </div>
+                <strong>{formatInr(repurchaseLeftBv, 2)}</strong>
+                <small>Team product volume</small>
+              </div>
+              <div className="dash-rp-leg dash-rp-leg-match">
+                <div className="dash-rp-leg-label">
+                  <i aria-hidden="true">M</i>
+                  <span>Match BV</span>
+                </div>
+                <strong>{formatInr(repurchaseMatchBv, 2)}</strong>
+                <small>Ready to close</small>
+              </div>
+              <div className="dash-rp-leg dash-rp-leg-right">
+                <div className="dash-rp-leg-label">
+                  <i aria-hidden="true">R</i>
+                  <span>Right BV</span>
+                </div>
+                <strong>{formatInr(repurchaseRightBv, 2)}</strong>
+                <small>Team product volume</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="row g-3 mb-3">
+        <div className="col-12 col-lg-7">
+          <div className="dash-panel dash-orders-panel h-100">
+            <div className="dash-panel-head">
+              <div>
+                <h3>Recent Orders</h3>
+                <p>Latest ecommerce order activity</p>
+              </div>
+              <Link to="/orders" className="dash-chip dash-chip-link">
+                View all
+              </Link>
+            </div>
+
+            {recentOrders.length === 0 ? (
+              <div className="dash-orders-empty">
+                <div className="dash-orders-empty-visual" aria-hidden="true">
+                  <MetricIcon type="bag" />
+                </div>
+                <h4>No orders yet</h4>
+                <p>Start shopping wellness products and your recent orders will show up here.</p>
+                <Link to="/products" className="btn primary">
+                  Shop Products
+                </Link>
+              </div>
+            ) : (
               <div className="table-responsive">
                 <table className="table table-sm align-middle mb-0 commerce-table">
                   <thead>
@@ -351,30 +725,76 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {recentOrders.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="text-muted py-3">No orders yet</td>
+                    {recentOrders.map((order) => (
+                      <tr key={order.orderId}>
+                        <td>
+                          <Link to={`/orders/${order.orderId}`}>{order.order_number}</Link>
+                        </td>
+                        <td className="d-none d-sm-table-cell">{order.invoice_number || '—'}</td>
+                        <td>{formatInr(order.grand_total || 0)}</td>
+                        <td>
+                          <em className={`order-status ${String(order.order_status || '').replace(/_/g, '')}`}>
+                            {String(order.order_status || '').replace(/_/g, ' ')}
+                          </em>
+                        </td>
                       </tr>
-                    ) : (
-                      recentOrders.map((order) => (
-                        <tr key={order.orderId}>
-                          <td>{order.order_number}</td>
-                          <td className="d-none d-sm-table-cell">{order.invoice_number || '—'}</td>
-                          <td>₹{Number(order.grand_total || 0).toFixed(0)}</td>
-                          <td>
-                            <em className={`order-status ${String(order.order_status || '').replace(/_/g, '')}`}>
-                              {String(order.order_status || '').replace(/_/g, ' ')}
-                            </em>
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+        </div>
+
+        <div className="col-12 col-lg-5">
+          <div className="dash-panel dash-actions-panel mb-3">
+            <div className="dash-panel-head">
+              <div>
+                <h3>Quick Actions</h3>
+                <p>Jump to everyday tasks</p>
+              </div>
+            </div>
+            <div className="dash-quick-grid">
+              {quickActions.map((action) => (
+                <Link key={action.to} to={action.to} className={`dash-quick-btn ${action.tone}`}>
+                  <span className="dash-quick-icon">
+                    <MetricIcon type={action.icon} />
+                  </span>
+                  <strong>{action.label}</strong>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="dash-wellness-banner">
+            <div className="dash-wellness-copy">
+              <span>Wellness Collection</span>
+              <h3>Wellness is a choice. Better life is a result.</h3>
+              <Link to="/products" className="btn primary">
+                Explore Products
+                <MetricIcon type="arrow" />
+              </Link>
+            </div>
+            <div className="dash-wellness-art" aria-hidden="true">
+              <MetricIcon type="leaf" />
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="dash-trust-bar">
+        <span>
+          <i className="leaf" /> 100% Natural
+        </span>
+        <span>
+          <i className="star" /> Premium Quality
+        </span>
+        <span>
+          <i className="coin" /> Better Earnings
+        </span>
+        <span>
+          <i className="users" /> Stronger Together
+        </span>
       </div>
     </div>
   );

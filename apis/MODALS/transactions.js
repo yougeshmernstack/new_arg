@@ -20,6 +20,8 @@ const transactionSchema = new mongoose.Schema({
     level: { type: String },
     level_distribution_status: { type: Number,default:0 },
     community_distribution_status: { type: Number,default:0 },
+    // 0 = pending, 1 = upline matching share already distributed
+    upline_distribution_status: { type: Number, default: 0 },
     amount: { type: Number ,required:true},
     order_amount: { type: Number},
     user_package: { type: Number},

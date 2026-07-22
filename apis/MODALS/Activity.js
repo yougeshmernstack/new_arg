@@ -50,7 +50,7 @@ const act = [
     {
         name: 'matching_income',
         view: 'Matching income',
-        description: 'Matching Activity',
+        description: 'Binary matching income (2:1)',
         type: 'income',
         debit_credit: 'credit',
         use_wallet: [
@@ -60,7 +60,7 @@ const act = [
             }
         ],
         status: 1,
-        allowed_roles: ['user'],
+        allowed_roles: ['distributor', 'user', 'admin'],
         act_id: 2
     },
     {
@@ -110,8 +110,24 @@ const act = [
 
         ],
         status: 1,
-        allowed_roles: ['user'],
+        allowed_roles: ['user', 'distributor'],
         act_id: 5
+    },
+    {
+        name: 'withdrawal_refund',
+        view: 'Withdrawal Refund',
+        description: 'Credit main wallet when withdrawal request is rejected',
+        type: 'refund',
+        debit_credit: 'credit',
+        use_wallet: [
+            {
+                wallet_name: 'main_wallet',
+                percentage: 100
+            }
+        ],
+        status: 1,
+        allowed_roles: ['distributor', 'admin'],
+        act_id: 19
     },
     {
         name: 'generate_fund',
@@ -290,6 +306,38 @@ const act = [
         allowed_roles: ['distributor'],
         act_id: 16
     },
+    {
+        name: 'repurchase_matching_income',
+        view: 'Repurchase Matching Income',
+        description: 'Repurchase matching income on product BV (1:1 × 500)',
+        type: 'income',
+        debit_credit: 'credit',
+        use_wallet: [
+            {
+                wallet_name: 'main_wallet',
+                percentage: 100
+            }
+        ],
+        status: 1,
+        allowed_roles: ['distributor', 'user', 'admin'],
+        act_id: 17
+    },
+    {
+        name: 'upline_matching_income',
+        view: 'Upline Matching Income',
+        description: 'Share of sponsor matching income distributed equally to active directs',
+        type: 'income',
+        debit_credit: 'credit',
+        use_wallet: [
+            {
+                wallet_name: 'main_wallet',
+                percentage: 100
+            }
+        ],
+        status: 1,
+        allowed_roles: ['distributor', 'user', 'admin'],
+        act_id: 18
+    },
 ]
 async function ensureActivity(def) {
     const existing = await Activity.findOne({ name: def.name });
@@ -350,6 +398,66 @@ async function saveActivity() {
                 status: 1,
                 allowed_roles: ['distributor'],
                 act_id: 16
+            });
+            // Binary matching income (1:1 closing)
+            await ensureActivity({
+                name: 'matching_income',
+                view: 'Matching income',
+                description: 'Binary matching income (1:1 × 1250)',
+                type: 'income',
+                debit_credit: 'credit',
+                use_wallet: [{ wallet_name: 'main_wallet', percentage: 100 }],
+                status: 1,
+                allowed_roles: ['distributor', 'user', 'admin'],
+                act_id: 2
+            });
+            // Repurchase matching income (product BV, no dummy)
+            await ensureActivity({
+                name: 'repurchase_matching_income',
+                view: 'Repurchase Matching Income',
+                description: 'Repurchase matching income on product BV (1:1 × 500)',
+                type: 'income',
+                debit_credit: 'credit',
+                use_wallet: [{ wallet_name: 'main_wallet', percentage: 100 }],
+                status: 1,
+                allowed_roles: ['distributor', 'user', 'admin'],
+                act_id: 17
+            });
+            // Upline matching income (share of sponsor matching → active directs)
+            await ensureActivity({
+                name: 'upline_matching_income',
+                view: 'Upline Matching Income',
+                description: 'Share of sponsor matching income distributed equally to active directs',
+                type: 'income',
+                debit_credit: 'credit',
+                use_wallet: [{ wallet_name: 'main_wallet', percentage: 100 }],
+                status: 1,
+                allowed_roles: ['distributor', 'user', 'admin'],
+                act_id: 18
+            });
+            // Distributor withdrawal from main wallet
+            await ensureActivity({
+                name: 'withdrawal',
+                view: 'withdrawal',
+                description: 'withdrawal Activity',
+                type: 'withdrawal',
+                debit_credit: 'debit',
+                use_wallet: [{ wallet_name: 'main_wallet', percentage: 100 }],
+                status: 1,
+                allowed_roles: ['user', 'distributor'],
+                act_id: 5
+            });
+            // Refund main wallet on withdrawal reject
+            await ensureActivity({
+                name: 'withdrawal_refund',
+                view: 'Withdrawal Refund',
+                description: 'Credit main wallet when withdrawal request is rejected',
+                type: 'refund',
+                debit_credit: 'credit',
+                use_wallet: [{ wallet_name: 'main_wallet', percentage: 100 }],
+                status: 1,
+                allowed_roles: ['distributor', 'admin'],
+                act_id: 19
             });
         }
     } catch (error) {

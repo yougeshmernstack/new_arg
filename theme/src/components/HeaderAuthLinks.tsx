@@ -20,21 +20,25 @@ export function HeaderAuthLinks() {
 
   if (!loggedIn) {
     return (
-      <Link className="header-link" href="/login">
-        Login
-      </Link>
+      <div className="header-auth">
+        <Link className="header-link" href="/login">
+          Sign in
+        </Link>
+        <Link className="button button-soft header-signup" href="/signup">
+          Sign up
+        </Link>
+      </div>
     );
   }
 
   return (
     <>
-      <Link className="header-link" href="/account/change-password">
-        Change Password
+      <Link className="header-link header-link-muted" href="/account/change-password">
+        Account
       </Link>
       <button
         type="button"
         className="header-link"
-        style={{ background: 'none', border: 0, cursor: 'pointer', font: 'inherit' }}
         onClick={() => {
           clearThemeToken();
           setLoggedIn(false);

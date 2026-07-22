@@ -42,17 +42,82 @@ export type ShopProduct = {
   videos?: string[];
 };
 
-async function request(path: string, options: RequestInit = {}) {
-  const token = getThemeToken();
+export type CatalogProduct = ShopProduct & {
+  categoryId?: number;
+  brandId?: number;
+  packageId?: number;
+};
+
+export type CatalogPackage = {
+  packageId: number;
+  name: string;
+  price: number;
+  amount?: number;
+  discounted_amount?: number;
+  description?: string;
+  benefits?: string[];
+  items?: { productId: number; quantity: number }[];
+  itemNames?: string[];
+  image?: string | null;
+  status?: string;
+};
+
+export type SiteContent = {
+  name: string;
+  shortName?: string;
+  tagline?: string;
+  motto?: string;
+  slogan?: string;
+  subSlogan?: string;
+  description?: string;
+  about?: string;
+  aboutExtended?: string[];
+  vision?: string;
+  mission?: string;
+  commitment?: string;
+  howItWasBuilt?: string;
+  values?: { label: string; description: string }[];
+  offerings?: { title: string; description: string }[];
+  pillars?: { label: string; description: string }[];
+  features?: { label: string; description: string }[];
+  assurances?: string[];
+  benefits?: string[];
+  contact?: {
+    phone?: string;
+    email?: string;
+    website?: string;
+    hours?: string;
+    address?: string;
+    supportNote?: string;
+  };
+  founders?: { name: string; role: string; bio: string; photoUrl: string }[];
+  logo?: string;
+  heroImage?: string;
+};
+
+export type LegalDoc = {
+  documentId: number;
+  slug: string;
+  title: string;
+  summary?: string;
+  fileUrl: string;
+  sortOrder?: number;
+};
+
+async function request(path: string, options: RequestInit = {}, requireAuth = true) {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> | undefined),
   };
-  if (token) headers.Authorization = token;
+  if (requireAuth) {
+    const token = getThemeToken();
+    if (token) headers.Authorization = token;
+  }
 
   const res = await fetch(`${API_BASE}${API_PREFIX}${path}`, {
     ...options,
     headers,
+    cache: options.cache ?? 'no-store',
   });
 
   const data = await res.json().catch(() => ({}));
@@ -64,6 +129,10 @@ async function request(path: string, options: RequestInit = {}) {
     throw error;
   }
   return data;
+}
+
+async function publicRequest(path: string, options: RequestInit = {}) {
+  return request(path, options, false);
 }
 
 export const themeApi = {
@@ -95,4 +164,28 @@ export const themeApi = {
   getOrders: () => request('/get-orders?limit=50'),
   getOrder: (orderId: number | string) =>
     request(`/get-order?orderId=${orderId}`),
+
+  // Public catalog / CMS
+  getSiteContent: () => publicRequest('/get-site-content'),
+  getLegalDocuments: () => publicRequest('/get-legal-documents'),
+  catalogProducts: (params?: Record<string, string | number | undefined>) => {
+    const qs = new URLSearchParams();
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v));
+    });
+    const q = qs.toString();
+    return publicRequest(`/catalog-products${q ? `?${q}` : ''}`);
+  },
+  catalogProduct: (productId: number | string) =>
+    publicRequest(`/catalog-product?productId=${productId}`),
+  catalogPackages: (params?: Record<string, string | number | undefined>) => {
+    const qs = new URLSearchParams();
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v));
+    });
+    const q = qs.toString();
+    return publicRequest(`/catalog-packages${q ? `?${q}` : ''}`);
+  },
+  catalogPackage: (packageId: number | string) =>
+    publicRequest(`/catalog-package?packageId=${packageId}`),
 };

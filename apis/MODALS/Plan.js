@@ -1,213 +1,89 @@
 const mongoose = require('mongoose');
 
-const levelIncomeSchema = new mongoose.Schema({
-    direct_required: { type: Number, default: 0 },
-    total_team_required: { type: Number, default: 0 },
-    team_required_by_level: { type: Number, default: 0 },
-    business_required: { type: Number, default: 0 },
-    income: { type: Number, default: 50 },
-    status: { type: Number, enum: [0, 1], default: 1 },
-    level: { type: Number }
-}, { _id: false });
-
-const achieve_rankSchema = new mongoose.Schema({
-    level_required: { type: Number, default: 0 },
-    rank_name: { type: String },
-    require_business: { type: Number, default: 0 }
-}, { _id: false });
-
 const rewardSchema = new mongoose.Schema({
-    rankId: { type: Number, required: true },
-    rank_name: { type: String, required: false },
-    required_business: { type: Number, default: 0 },
-    strong_leg_ratio: { type: Number, default: 0 },
-    second_strong_leg_ratio: { type: Number, default: 0 },
-    other_legs_ratio: { type: Number, default: 0 },
-    monthly_income: {
-        team_rank_required: { type: Number, default: 0 },
-        amount: { type: Number, default: 0 },
-        duration: { type: Number, default: 0 },
-        status: { type: Number, enum: [0, 1], default: 0 }
-    },
-    royalty_income: {
-        amount: { type: Number, default: 0 },
-        duration: { type: Number, default: 0 },
-        status: { type: Number, enum: [0, 1], default: 0 }
-    },
-    instant_income: {
-        team_rank_required: { type: Number, default: 0 },
-        amount: { type: Number, default: 0 },
-        status: { type: Number, enum: [0, 1], default: 0 }
-    },
-    cto_income: {
-        amount: { type: Number, default: 0 },
-        status: { type: Number, enum: [0, 1], default: 0 }
-    }
-}, { _id: false, strict: false }); // strict: false allows additional fields not in schema
+    rank_id: { type: Number, default: 0 },
+    rank_name: { type: String, default: '' },
+    matched_business: { type: Number, default: 0 },
+    reward_amount: { type: Number, default: 0 },
+    reward_item: { type: String, default: '' },
+});
 
+const royalitySchema = new mongoose.Schema({
+    rank_id: { type: Number, default: 0 },
+    rank_name: { type: String, default: '' },
+    matched_business: { type: Number, default: 0 },
+    income: { type: Number, default: 0 },
+    reward_item: { type: String, default: '' },
+});
+
+const travelingBonusSchema = new mongoose.Schema({
+    rank_id: { type: Number, default: 0 },
+    rank_name: { type: String, default: '' },
+    matched_business: { type: Number, default: 0 },
+    income: { type: Number, default: 0 },
+    reward_item: { type: String, default: '' },
+});
 const planSchema = new mongoose.Schema({
     planId: { type: Number, default: 1, unique: true },
 
     planType: {
         options: { type: String, default: "binary,generation,matrix" },
-        value: { type: String, default: "generation" }
+        value: { type: String, default: "binary" }
     },
 
-    packages: {
-        type: [
-            {
-                name: { type: String },
-                packageId: { type: Number },
-                min_amount: { type: Number },
-                max_amount: { type: Number },
-                multiplier: { type: Number },
-                staking_period: { type: Number, default: 1095 }, // 3 years in days
-                total_capping: { type: Number },
-                included_incomes_for_capping: {
-                    type: [String],
-                    default: [
-                        "roi_income",
-                        "level_income",
-                        "daily_trading_profit",
-                        "direct_referral_bonus",
-                        "instant_leadership_reward",
-                        "team_activity_bonus"
-                    ]
-                }
-            }
-        ],
-        default: [
-            {
-                name: "Starter Plan",
-                packageId: 1,
-                min_amount: 20,
-                max_amount: 20,
-                multiplier: 1,
-                staking_period: 1095,
-                total_capping: 200
-            },
-            {
-                name: "Silver Plan",
-                packageId: 2,
-                min_amount: 50,
-                max_amount: 50,
-                multiplier: 1.5,
-                staking_period: 1095,
-                total_capping: 400
-            },
-            {
-                name: "Gold Plan",
-                packageId: 3,
-                min_amount: 100,
-                max_amount: 100,
-                multiplier: 2,
-                staking_period: 1095,
-                total_capping: 800
-            }
-        ]
-    },
-
-    roi_income: {
-        income_type: { type: String, enum: ['fix', 'percentage'], default: 'percentage' },
-        status: { type: Number, enum: [0, 1], default: 1 },
-        frequency: { type: String, enum: ['Daily', 'Monthly', 'Yearly', '10Days'], default: 'Daily' },
-        income: { type: Number, default: 10 },
-        distribution_ratio: {
-            roi: { type: Number, default: 100 },
-            level: { type: Number, default: 0 },
-            company: { type: Number, default: 0 }
-        },
-        duration: { type: Number, default: 108 },
-        maximum: { type: Number, default: 1e18 }
-    },
-
-    // Level Income
-    level_income: {
-        income_type: { type: String, enum: ['fix', 'percentage'], default: 'percentage' },
-        status: { type: Number, enum: [0, 1], default: 1 },
-        level: {
-            type: [levelIncomeSchema],
-            default: () => Array.from({ length: 10 }, () => ({
-                direct_required: 0,
-                total_team_required: 0,
-                team_required_by_level: 0,
-                business_required: 0,
-                income: 0
-            }))
-        }
-    },
-
-    // ROI Level Income
-    roi_level_income: {
-        income_type: { type: String, enum: ['fix', 'percentage'], default: 'percentage' },
-        status: { type: Number, enum: [0, 1], default: 1 },
-        level: {
-            type: [levelIncomeSchema],
-            default: () => Array.from({ length: 20 }, () => ({
-                direct_required: 0,
-                total_team_required: 0,
-                team_required_by_level: 0,
-                business_required: 0,
-                income: 0.5
-            }))
-        }
-    },
-
-    // Reward System
-    reward: {
-        income_type: { type: String, enum: ['fix', 'percentage'], default: 'fix' },
-        status: { type: Number, enum: [0, 1], default: 1 },
-        rewards: {
-            type: [rewardSchema],
-            default: [
-                { rankId: 1, rank_name: "1 Star", royalty_income: { direct_business_required: 0, team_required_business: 0, direct_required: 0, team_required: 0, investment_required: 25, amount: 0, status: 1 } },
-                { rankId: 2, rank_name: "2 Star", royalty_income: { direct_business_required: 500, team_required_business: 2000, direct_required: 3, team_required: 6, investment_required: 200, amount: 0.5, status: 1 } },
-                { rankId: 3, rank_name: "3 Star", royalty_income: { direct_business_required: 1000, team_required_business: 10000, direct_required: 5, team_required: 50, investment_required: 500, amount: 0.5, status: 1 } },
-                { rankId: 4, rank_name: "4 Star", royalty_income: { direct_business_required: 5000, team_required_business: 50000, direct_required: 10, team_required: 150, investment_required: 2000, amount: 0.5, status: 1 } },
-                { rankId: 5, rank_name: "5 Star", royalty_income: { direct_business_required: 10000, team_required_business: 100000, direct_required: 20, team_required: 300, investment_required: 2500, amount: 0.5, status: 1 } }
-            ]
-        }
-    },
-
-    // Reward System 2 (Second reward type)
-    reward_2: {
-        income_type: { type: String, enum: ['fix', 'percentage'], default: 'fix' },
-        status: { type: Number, enum: [0, 1], default: 1 },
-        rewards: {
-            type: [rewardSchema],
-            default: []
-        }
-    },
-
-    // New Income Types Added (from image)
-    daily_trading_profit: {
-        income_type: { type: String, enum: ['fix', 'percentage'], default: 'percentage' },
-        status: { type: Number, enum: [0, 1], default: 1 },
-        amount: { type: Number, default: 5 }
-    },
-    direct_referral_bonus: {
-        income_type: { type: String, enum: ['fix', 'percentage'], default: 'percentage' },
-        status: { type: Number, enum: [0, 1], default: 1 },
-        amount: { type: Number, default: 10 }
-    },
     // Direct sponsor income on package purchase — % of package BV
     direct_income: {
         income_type: { type: String, enum: ['fixed', 'percentage'], default: 'percentage' },
         status: { type: Number, enum: [0, 1], default: 1 },
         amount: { type: Number, default: 15 }
     },
-    instant_leadership_reward: {
-        income_type: { type: String, enum: ['fix', 'percentage'], default: 'percentage' },
-        status: { type: Number, enum: [0, 1], default: 1 },
-        amount: { type: Number, default: 3 }
-    },
-    team_activity_bonus: {
-        income_type: { type: String, enum: ['fix', 'percentage'], default: 'percentage' },
-        status: { type: Number, enum: [0, 1], default: 1 },
-        amount: { type: Number, default: 2 }
-    },
 
-    buy_status: { type: Number, enum: [0, 1], default: 1 }
+    matching_income: {
+        income_type: { type: String, enum: ['fixed', 'percentage'], default: 'percentage' },
+        status: { type: Number, enum: [0, 1], default: 1 },
+        amount: { type: Number, default: 10 }
+    },
+    repurchase_matching_income: {
+        income_type: { type: String, enum: ['fixed', 'percentage'], default: 'percentage' },
+        status: { type: Number, enum: [0, 1], default: 1 },
+        amount: { type: Number, default: 12 }
+    },
+    upline_matching_income: {
+        income_type: { type: String, enum: ['fixed', 'percentage'], default: 'percentage' },
+        status: { type: Number, enum: [0, 1], default: 1 },
+        amount: { type: Number, default: 10 }
+    },
+    reward: {
+        type: [rewardSchema],
+        default: [
+            { rank_id: 1, rank_name: 'Reward 1', matched_business: 10000, reward_amount: 100, reward_item: 'Premium Watch' },
+            { rank_id: 2, rank_name: 'Reward 2', matched_business: 25000, reward_amount: 200, reward_item: 'Trolly Set' },
+            { rank_id: 3, rank_name: 'Reward 3', matched_business: 75000, reward_amount: 300, reward_item: '2d/1n Shimla tour' },
+            { rank_id: 4, rank_name: 'Reward 4', matched_business: 200000, reward_amount: 400, reward_item: 'Gold Jewellery' },
+            { rank_id: 5, rank_name: 'Reward 5', matched_business: 500000, reward_amount: 500, reward_item: 'Pataya Tour 5d/4n' },
+            { rank_id: 6, rank_name: 'Reward 6', matched_business: 1250000, reward_amount: 600, reward_item: 'honda activa' },
+            { rank_id: 7, rank_name: 'Reward 7', matched_business: 3000000, reward_amount: 700, reward_item: 'Royal enfield' },
+            { rank_id: 8, rank_name: 'Reward 8', matched_business: 7500000, reward_amount: 800, reward_item: 'Ceuze Tour' },
+            { rank_id: 9, rank_name: 'Reward 9', matched_business: 18000000, reward_amount: 900, reward_item: 'Car fund 15 lakh' },
+            { rank_id: 10, rank_name: 'Reward 10', matched_business: 45000000, reward_amount: 1000, reward_item: 'BMW Car' },
+        ]
+    },
+    royality: {
+        type: [royalitySchema],
+        default: [
+            { rank_id: 1, rank_name: 'Royality 1', matched_business: 200000, income: 3, reward_item: 'Premium Watch' },
+            { rank_id: 2, rank_name: 'Royality 2', matched_business: 500000, income: 2, reward_item: 'Trolly Set' },
+            { rank_id: 3, rank_name: 'Royality 3', matched_business: 1200000, income: 2, reward_item: '2d/1n Shimla tour' },
+            { rank_id: 4, rank_name: 'Royality 4', matched_business: 1800000, income: 2, reward_item: 'Gold Jewellery' },
+            { rank_id: 5, rank_name: 'Royality 5', matched_business: 3000000, income: 1, reward_item: 'Pataya Tour 5d/4n' },
+        ]
+    },
+    traveling_bonus: {
+        type: [travelingBonusSchema],
+        default: [
+            { rank_id: 1, rank_name: 'Traveling Bonus', matched_business: 200000, income: 3, reward_item: '3% traveling Bonus + 2% Accidenctal insurance (1 Year)' },
+        ]
+    },
 
 }, {
     collection: 'plan_data'
@@ -215,41 +91,45 @@ const planSchema = new mongoose.Schema({
 
 const PlansInfo = mongoose.model('PlansInfo', planSchema);
 
+/**
+ * Ensure plan_data has planId:1 with reward / royality / traveling_bonus tiers.
+ * Safe to call repeatedly (upsert + backfill empty arrays).
+ */
 async function ensurePlanData() {
-    try {
-        let plan = await PlansInfo.findOne({ planId: 1 });
-        if (!plan) {
-            plan = await PlansInfo.create({
-                planId: 1,
-                direct_income: {
-                    income_type: 'percentage',
-                    status: 1,
-                    amount: 15
-                }
-            });
-            return plan;
-        }
-        if (!plan.direct_income || plan.direct_income.amount == null) {
-            plan.direct_income = {
-                income_type: plan.direct_income?.income_type || 'percentage',
-                status: plan.direct_income?.status != null ? plan.direct_income.status : 1,
-                amount: 15
-            };
-            await plan.save();
-        }
+    let plan = await PlansInfo.findOne({ planId: 1 });
+    if (!plan) {
+        plan = await new PlansInfo({ planId: 1 }).save();
         return plan;
-    } catch (err) {
-        return null;
     }
+
+    const patch = {};
+    if (!Array.isArray(plan.reward) || plan.reward.length === 0) {
+        patch.reward = planSchema.path('reward').options.default;
+    } else {
+        // Fix legacy duplicate rank_id 9 on Reward 10
+        const needsFix = plan.reward.some((r) => r.rank_name === 'Reward 10' && Number(r.rank_id) === 9);
+        if (needsFix) {
+            patch.reward = plan.reward.map((r) => {
+                const obj = typeof r.toObject === 'function' ? r.toObject() : { ...r };
+                if (obj.rank_name === 'Reward 10' && Number(obj.rank_id) === 9) obj.rank_id = 10;
+                return obj;
+            });
+        }
+    }
+    if (!Array.isArray(plan.royality) || plan.royality.length === 0) {
+        patch.royality = planSchema.path('royality').options.default;
+    }
+    if (!Array.isArray(plan.traveling_bonus) || plan.traveling_bonus.length === 0) {
+        patch.traveling_bonus = planSchema.path('traveling_bonus').options.default;
+    }
+
+    if (Object.keys(patch).length) {
+        await PlansInfo.updateOne({ planId: 1 }, { $set: patch });
+        plan = await PlansInfo.findOne({ planId: 1 });
+    }
+    return plan;
 }
 
-if (mongoose.connection.readyState === 1) {
-    ensurePlanData();
-} else {
-    mongoose.connection.once('connected', () => {
-        ensurePlanData();
-    });
-}
+PlansInfo.ensurePlanData = ensurePlanData;
 
 module.exports = PlansInfo;
-module.exports.ensurePlanData = ensurePlanData;

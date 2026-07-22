@@ -7,8 +7,10 @@ import BrandLogo from '../common/BrandLogo';
 import '../../styles/layout.css';
 
 const links = [
-  { to: '/', label: 'Overview', icon: 'grid', end: true },
+  { to: '/', label: 'Dashboard', icon: 'grid', end: true },
   { to: '/fund-wallet', label: 'Fund Wallet', icon: 'wallet' },
+  { to: '/withdraw', label: 'Withdraw', icon: 'wallet' },
+  { to: '/kyc', label: 'KYC', icon: 'user' },
   { to: '/packages', label: 'Packages', icon: 'box' },
   { to: '/products', label: 'Products', icon: 'box' },
   { to: '/cart', label: 'Cart', icon: 'cart' },
@@ -24,7 +26,16 @@ const links = [
       { to: '/team/binary', label: 'Binary Team' },
     ],
   },
-  { to: '/profile', label: 'Business profile', icon: 'user' },
+  {
+    label: 'Rewards',
+    icon: 'gift',
+    children: [
+      { to: '/rewards', label: 'Reward' },
+      { to: '/royality', label: 'Royality' },
+      { to: '/traveling', label: 'Traveling Allowance' },
+    ],
+  },
+  { to: '/profile', label: 'Business Profile', icon: 'user' },
   { to: '/change-password', label: 'Change Password', icon: 'user' },
   { to: '/notifications', label: 'Notifications', icon: 'bell' },
 ];
@@ -37,8 +48,10 @@ const bottomTabs = [
 ];
 
 const titles = {
-  '/': ['Overview', 'Track your distribution business at a glance'],
+  '/': ['Dashboard', 'Track your business, earnings and team performance.'],
   '/fund-wallet': ['Fund Wallet', 'Deposit funds via UPI/bank and track approval status'],
+  '/withdraw': ['Withdraw', 'Claim income from Main Wallet (KYC approved required)'],
+  '/kyc': ['KYC Verification', 'Submit and track PAN, Bank, Aadhaar and Nominee KYC'],
   '/packages': ['Packages', 'Buy a package to activate your account'],
   '/products': ['Products', 'Browse available products and add to cart'],
   '/cart': ['Cart', 'Review items before checkout'],
@@ -49,9 +62,19 @@ const titles = {
   '/team/left': ['Left Team', 'Members on your left binary leg'],
   '/team/right': ['Right Team', 'Members on your right binary leg'],
   '/team/binary': ['Binary Team', 'Your binary tree by parent placement'],
-  '/profile': ['Business profile', 'Manage your account and contact details'],
+  '/rewards': ['Reward', 'Ranks unlocked by lifetime matched business'],
+  '/royality': ['Royality', 'Royality ranks based on matched business'],
+  '/traveling': ['Traveling Allowance', 'Traveling bonus based on matched business'],
+  '/profile': ['Business Profile', 'Manage your account and contact details'],
   '/notifications': ['Notifications', 'Stay updated with your latest activity'],
 };
+
+function greetingForNow() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good Morning';
+  if (hour < 17) return 'Good Afternoon';
+  return 'Good Evening';
+}
 
 function Icon({ name }) {
   const paths = {
@@ -63,6 +86,7 @@ function Icon({ name }) {
     cart: <><circle cx="9" cy="20" r="1" /><circle cx="17" cy="20" r="1" /><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.4a2 2 0 0 0 2-1.5L21 8H7" /></>,
     list: <><path d="M8 6h13" /><path d="M8 12h13" /><path d="M8 18h13" /><path d="M3 6h.01" /><path d="M3 12h.01" /><path d="M3 18h.01" /></>,
     wallet: <><path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2H5a2 2 0 0 0 0 4h14v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" /><path d="M17 12h.01" /></>,
+    gift: <><rect x="3" y="8" width="18" height="13" rx="2" /><path d="M12 8v13" /><path d="M3 12h18" /><path d="M12 8H7.5a2.5 2.5 0 1 1 0-5C11 3 12 8 12 8z" /><path d="M12 8h4.5a2.5 2.5 0 1 0 0-5C13 3 12 8 12 8z" /></>,
     chevron: <><path d="M6 9l6 6 6-6" /></>,
     logout: <><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /></>,
     menu: <><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>,
@@ -95,6 +119,15 @@ function resolveTitle(pathname) {
   if (pathname.startsWith('/orders/') && pathname !== '/orders') {
     return ['Order details', 'Track status and items for this order'];
   }
+  if (pathname.startsWith('/income/')) {
+    const slug = decodeURIComponent(pathname.split('/')[2] || '');
+    const label = slug
+      .split('_')
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+    return [label || 'Income History', 'Credit history for this income type'];
+  }
   return titles[pathname] || titles['/'];
 }
 
@@ -107,17 +140,34 @@ export default function AppLayout() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const teamActive = location.pathname.startsWith('/team');
+  const rewardsActive =
+    location.pathname.startsWith('/rewards')
+    || location.pathname.startsWith('/royality')
+    || location.pathname.startsWith('/traveling');
   const moreActive = teamActive
+    || rewardsActive
     || location.pathname.startsWith('/profile')
     || location.pathname.startsWith('/notifications')
-    || location.pathname.startsWith('/fund-wallet');
+    || location.pathname.startsWith('/fund-wallet')
+    || location.pathname.startsWith('/withdraw');
   const [teamOpen, setTeamOpen] = useState(teamActive);
+  const [rewardsOpen, setRewardsOpen] = useState(rewardsActive);
+  const isDashboard = location.pathname === '/';
   const [title, subtitle] = resolveTitle(location.pathname);
   const accountId = user?.username || profile?.username || '';
   const displayName = profile?.name || user?.name || accountId || 'Distributor';
   const initial = displayName.charAt(0).toUpperCase();
   const accountStatus = String(profile?.status || 'active').toLowerCase();
   const isActive = accountStatus === 'active' && Number(profile?.blockStatus || 0) !== 1;
+  const todayLabel = new Date().toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const headerTitle = isDashboard ? `${greetingForNow()}, ${displayName}!` : title;
+  const headerSubtitle = isDashboard
+    ? 'Track your business, earnings and team performance.'
+    : subtitle;
 
   const closeMenu = () => setMenuOpen(false);
   const toggleMenu = () => setMenuOpen((open) => !open);
@@ -148,6 +198,10 @@ export default function AppLayout() {
   useEffect(() => {
     if (teamActive) setTeamOpen(true);
   }, [teamActive]);
+
+  useEffect(() => {
+    if (rewardsActive) setRewardsOpen(true);
+  }, [rewardsActive]);
 
   useEffect(() => {
     let active = true;
@@ -214,13 +268,23 @@ export default function AppLayout() {
         <nav className="side-nav">
           {links.map((link) => {
             if (link.children) {
+              const isTeam = link.label === 'Team';
+              const isRewards = link.label === 'Rewards';
+              const groupOpen = isTeam ? teamOpen : isRewards ? rewardsOpen : false;
+              const groupActive = isTeam ? teamActive : isRewards ? rewardsActive : false;
+              const toggleOpen = isTeam
+                ? () => setTeamOpen((open) => !open)
+                : isRewards
+                  ? () => setRewardsOpen((open) => !open)
+                  : () => {};
+
               return (
-                <div key={link.label} className={`nav-group ${teamOpen || teamActive ? 'open' : ''}`}>
+                <div key={link.label} className={`nav-group ${groupOpen || groupActive ? 'open' : ''}`}>
                   <button
                     type="button"
-                    className={`side-link nav-group-toggle ${teamActive ? 'active' : ''}`}
-                    aria-expanded={teamOpen}
-                    onClick={() => setTeamOpen((open) => !open)}
+                    className={`side-link nav-group-toggle ${groupActive ? 'active' : ''}`}
+                    aria-expanded={groupOpen}
+                    onClick={toggleOpen}
                   >
                     <Icon name={link.icon} />
                     <span>{link.label}</span>
@@ -257,15 +321,22 @@ export default function AppLayout() {
           })}
         </nav>
 
-        <div className="sidebar-foot sidebar-user">
-          <span className="sidebar-foot-label">Account</span>
-          <button type="button" className="sidebar-user-row" onClick={openProfile}>
+        <div className="sidebar-bottom">
+          <button type="button" className="sidebar-user-card" onClick={openProfile}>
             <span className="user-avatar">{initial}</span>
             <div className="sidebar-user-meta">
               <strong>{displayName}</strong>
               <small>{accountId ? `ID: ${accountId}` : 'Distributor'}</small>
             </div>
           </button>
+
+          <div className="sidebar-promo">
+            <span>Live Healthy</span>
+            <strong>Live Better</strong>
+            <NavLink to="/products" className="sidebar-promo-btn" onClick={closeMenu}>
+              Explore Products
+            </NavLink>
+          </div>
         </div>
       </aside>
 
@@ -282,11 +353,23 @@ export default function AppLayout() {
               <Icon name={menuOpen ? 'close' : 'menu'} />
             </button>
             <div className="topbar-title min-w-0">
-              <h1 className="text-truncate">{title}</h1>
-              <p className="d-none d-sm-block text-truncate mb-0">{subtitle}</p>
+              <h1 className={`text-truncate ${isDashboard ? 'is-greeting' : ''}`}>
+                {headerTitle}
+                {isDashboard ? <span className="greeting-leaf" aria-hidden="true"> 🌿</span> : null}
+              </h1>
+              <p className="d-none d-sm-block text-truncate mb-0">{headerSubtitle}</p>
             </div>
           </div>
           <div className="d-flex align-items-center gap-2 topbar-right flex-shrink-0">
+            <span className="topbar-date d-none d-md-inline">{todayLabel}</span>
+            <NavLink
+              to="/notifications"
+              className="icon-button topbar-bell"
+              aria-label="Notifications"
+              title="Notifications"
+            >
+              <Icon name="bell" />
+            </NavLink>
             <button
               type="button"
               className="user-chip"
@@ -296,7 +379,7 @@ export default function AppLayout() {
               onClick={openProfile}
             >
               <span className="user-avatar">{initial}</span>
-              <span className="d-none d-md-grid">
+              <span className="d-none d-lg-grid">
                 <strong>{displayName}</strong>
                 <small>{accountId ? `ID: ${accountId}` : 'Distributor'}</small>
               </span>

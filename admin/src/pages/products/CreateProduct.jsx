@@ -19,6 +19,7 @@ const empty = {
   mrp: 0,
   distributor_price: 0,
   franchise_price: 0,
+  bv: 0,
   gst: 0,
   stock: 0,
   weight: '',
@@ -105,6 +106,7 @@ export default function CreateProduct() {
         mrp: Number(form.mrp),
         distributor_price: Number(form.distributor_price),
         franchise_price: Number(form.franchise_price),
+        bv: Number(form.bv),
         gst: Number(form.gst),
         stock: Number(form.stock),
         weight: form.weight,
@@ -166,6 +168,10 @@ export default function CreateProduct() {
         <label>
           Franchise price
           <input type="number" min="0" value={form.franchise_price} onChange={onChange('franchise_price')} />
+        </label>
+        <label>
+          BV (repurchase)
+          <input type="number" min="0" value={form.bv} onChange={onChange('bv')} />
         </label>
         <label>
           GST %

@@ -154,7 +154,10 @@ class TRANSACTION {
         }
         try {
             // Panel wallets (distributor / franchise / theme / admin)
+            // Mirror legacy UserWallet: credit/debit use_wallet slug AND source income wallet
+            // (e.g. direct_income → main_wallet + direct_income tracker)
             if (panel && resolveWalletModel(panel)) {
+                const WalletModel = resolveWalletModel(panel);
                 const wallets = await getPanelWallets(panel, uid, [slug]);
                 const entry = wallets.find((w) => w.slug === slug);
                 if (!entry) return;
@@ -168,6 +171,30 @@ class TRANSACTION {
 
                 if (release == 1) {
                     await updatePanelWalletValue(panel, uid, slug, newValue);
+                }
+
+                // Also update income tracker wallet when source slug already exists
+                // (do not create new wallets — avoid inventing slugs like package_purchase)
+                if (source && source !== slug) {
+                    const sourceDoc = await WalletModel.findOne(
+                        { uid: Number(uid), 'wallets.slug': source },
+                        { 'wallets.$': 1 }
+                    );
+                    const sourceEntry = sourceDoc?.wallets?.[0];
+                    if (sourceEntry) {
+                        const newValueSrc = debit_credit === 'credit'
+                            ? Number(sourceEntry.value) + Number(amount)
+                            : Number(sourceEntry.value) - Number(amount);
+                        await WalletModel.findOneAndUpdate(
+                            { uid: Number(uid), 'wallets.slug': source },
+                            {
+                                $set: {
+                                    'wallets.$.value': Number(newValueSrc),
+                                    'wallets.$.updated_on': new Date()
+                                }
+                            }
+                        );
+                    }
                 }
 
                 await Transaction.findOneAndUpdate(

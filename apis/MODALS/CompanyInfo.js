@@ -87,6 +87,30 @@ principal_withdrawal_status: {
   enum: [0, 1],
   default: 1
 },
+  // Distributor main-wallet withdrawal charges (edit in DB anytime)
+  withdrawal: {
+    status: {
+      type: Number,
+      enum: [0, 1],
+      default: 1
+    },
+    tds_percent: {
+      type: Number,
+      default: 2
+    },
+    admin_charge_percent: {
+      type: Number,
+      default: 5
+    },
+    min_withdrawal: {
+      type: Number,
+      default: 100
+    },
+    max_withdrawal: {
+      type: Number,
+      default: 1e18
+    }
+  },
   broadCast: {
     message: {
       type: String,

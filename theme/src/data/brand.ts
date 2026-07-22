@@ -94,8 +94,8 @@ export const brand = {
     "Glowing Skin",
     "Overall Well-being"
   ],
-  logo: "/images/brand/logo.png",
-  heroImage: "/images/brand/hero-flyer.jpeg"
+  logo: "/arg_logo.png",
+  heroImage: "/images/brand/hero-wellness.jpg"
 };
 
 export const legalDocuments = [

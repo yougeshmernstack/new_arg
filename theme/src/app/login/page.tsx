@@ -5,6 +5,11 @@ import { FormEvent, useState } from 'react';
 import { setThemeToken, themeApi } from '@/lib/themeApi';
 import { useRouter } from 'next/navigation';
 
+const DISTRIBUTOR_LOGIN =
+  process.env.NEXT_PUBLIC_DISTRIBUTOR_LOGIN_URL || 'http://192.168.18.20:3001/login';
+const FRANCHISE_LOGIN =
+  process.env.NEXT_PUBLIC_FRANCHISE_LOGIN_URL || 'http://192.168.18.20:3002/login';
+
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState('');
@@ -30,7 +35,16 @@ export default function LoginPage() {
   };
 
   return (
-    <section className="section" style={{ maxWidth: 420, margin: '2rem auto' }}>
+    <section className="section login-page">
+      <div className="login-tabs">
+        <Link className="login-tab is-active" href="/login">
+          Sign in
+        </Link>
+        <Link className="login-tab" href="/signup">
+          Sign up
+        </Link>
+      </div>
+
       <h1>Customer login</h1>
       <p>Sign in to shop live products, manage cart, and track orders.</p>
       {error ? <p className="alert error">{error}</p> : null}
@@ -62,10 +76,30 @@ export default function LoginPage() {
           {loading ? 'Signing in...' : 'Sign in'}
         </button>
       </form>
-      <p>
+
+      {/* <div className="login-auth-switch">
+        <p>New here?</p>
+        <Link className="button button-soft login-portal-btn" href="/signup">
+          Sign up
+        </Link>
+      </div> */}
+
+      <div className="login-portal-links">
+        <p className="login-portal-label">Other portals</p>
+        <a className="button button-soft login-portal-btn" href={DISTRIBUTOR_LOGIN}>
+          Distributor login
+        </a>
+        <a className="button button-soft login-portal-btn" href={FRANCHISE_LOGIN}>
+          Franchise login
+        </a>
+      </div>
+
+      <p className="login-demo">
         Demo user: <code>theme1</code> / <code>Admin@123</code>
       </p>
-      <Link href="/shop">Continue to shop</Link>
+      <Link className="text-link" href="/shop">
+        Continue to shop
+      </Link>
     </section>
   );
 }

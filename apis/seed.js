@@ -32,7 +32,6 @@ const PlansInfo = require('./MODALS/Plan');
 const { PermissionRoute } = require('./MODALS/Permission');
 const wellnessPermissionSeed = require('./SERVICES/WellnessPermissionSeed');
 const { ensurePanelWallet } = require('./utils/panelWallet');
-const { ensurePlanData } = PlansInfo;
 
 const Counter = mongoose.model('Counter');
 const DEFAULT_PASSWORD = 'Admin@123';
@@ -487,9 +486,10 @@ async function run() {
   const permissions = await seedPermissions();
   console.log('Permissions:', permissions);
 
-  const planData = await ensurePlanData();
+  const existingPlan = await PlansInfo.findOne({ planId: 1 });
+  const planData = await PlansInfo.ensurePlanData();
   console.log(
-    `plan_data         -> ${planData ? `ready (direct_income: ${planData.direct_income?.amount ?? 15}%)` : 'failed'}`
+    `plan_data         -> ${existingPlan ? 'exists' : 'created'} (direct_income: ${planData.direct_income?.amount ?? 15}%)`
   );
 
   const adminResult = await ensureAdmin();

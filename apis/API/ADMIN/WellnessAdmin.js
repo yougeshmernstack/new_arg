@@ -5,6 +5,8 @@ const ThemeUser = require('../../MODALS/ThemeUser');
 const Package = require('../../MODALS/Package');
 const Product = require('../../MODALS/Product');
 const CommerceOrder = require('../../MODALS/CommerceOrder');
+const Transaction = require('../../MODALS/transactions');
+const Wallets = require('../../MODALS/wallets');
 const AuditService = require('../../SERVICES/AuditService');
 const { LOW_STOCK_THRESHOLD } = require('./ProductAdmin');
 const { errorLogger } = require('../../utils/logger');
@@ -16,6 +18,58 @@ const PANEL_MODELS = {
     distributor: Distributor,
     theme: ThemeUser
 };
+
+function todayRange() {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    return { todayStart, todayEnd };
+}
+
+function daysAgoStart(days) {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - (days - 1));
+    return d;
+}
+
+function round2(value) {
+    return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function localDateKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function buildDayKeys(days) {
+    const keys = [];
+    const start = daysAgoStart(days);
+    for (let i = 0; i < days; i += 1) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        keys.push({
+            key: localDateKey(d),
+            label: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+        });
+    }
+    return keys;
+}
+
+function fillSeries(dayKeys, rows, fields) {
+    const map = Object.fromEntries((rows || []).map((row) => [row._id, row]));
+    return dayKeys.map(({ key, label }) => {
+        const hit = map[key] || {};
+        const point = { date: key, label };
+        fields.forEach((field) => {
+            point[field] = round2(hit[field]);
+        });
+        return point;
+    });
+}
 
 class WELLNESS_ADMIN {
     async loginAsUser(req, res) {
@@ -93,12 +147,44 @@ class WELLNESS_ADMIN {
     async wellnessDashboard(req, res) {
         try {
             const threshold = Number(req.query.low_stock_threshold) || LOW_STOCK_THRESHOLD;
+            const chartDays = Math.min(30, Math.max(7, Number(req.query.days) || 14));
+            const { todayStart, todayEnd } = todayRange();
+            const rangeStart = daysAgoStart(chartDays);
+            const dayKeys = buildDayKeys(chartDays);
+
+            const incomeWallets = await Wallets.find({ status: 1, wallet_type: 'income' }, 'slug name')
+                .sort({ id: 1 })
+                .lean();
+            const incomeSlugs = incomeWallets.map((w) => w.slug).filter(Boolean);
+            const incomeNameMap = Object.fromEntries(
+                incomeWallets.map((w) => [w.slug, w.name || w.slug])
+            );
+
+            const packageMatch = {
+                order_type: 'distributor_package_purchase',
+                order_status: { $nin: ['cancelled', 'refunded'] }
+            };
+            const orderValidMatch = {
+                order_status: { $nin: ['cancelled', 'refunded'] }
+            };
+            const incomeMatch = {
+                source: { $in: incomeSlugs.length ? incomeSlugs : ['__none__'] },
+                debit_credit: 'credit',
+                status: { $ne: 2 },
+                panel: 'distributor'
+            };
+            const todayCond = {
+                $and: [{ $gte: ['$created_date', todayStart] }, { $lte: ['$created_date', todayEnd] }]
+            };
+            const todayTxCond = {
+                $and: [{ $gte: ['$time', todayStart] }, { $lte: ['$time', todayEnd] }]
+            };
 
             const [
                 franchiseCount,
                 distributorCount,
                 themeUserCount,
-                packageCount,
+                packageCatalogCount,
                 productCount,
                 orderCount,
                 lowStockCount,
@@ -107,7 +193,19 @@ class WELLNESS_ADMIN {
                 deliveredOrders,
                 revenueAgg,
                 lowStockProducts,
-                outOfStockProducts
+                outOfStockProducts,
+                packagePurchaseAgg,
+                bvPurchaseAgg,
+                incomeByTypeAgg,
+                usersActive,
+                usersInactive,
+                usersTodayJoined,
+                usersTodayActive,
+                orderSeriesAgg,
+                incomeSeriesAgg,
+                usersJoinedSeriesAgg,
+                usersActiveSeriesAgg,
+                orderTypePieAgg
             ] = await Promise.all([
                 Franchise.countDocuments({ status: { $ne: 'disabled' } }),
                 Distributor.countDocuments({ status: { $ne: 'disabled' } }),
@@ -120,7 +218,7 @@ class WELLNESS_ADMIN {
                 CommerceOrder.countDocuments({ order_status: 'pending' }),
                 CommerceOrder.countDocuments({ order_status: 'delivered' }),
                 CommerceOrder.aggregate([
-                    { $match: { order_status: { $nin: ['cancelled', 'refunded'] } } },
+                    { $match: orderValidMatch },
                     { $group: { _id: null, revenue: { $sum: '$grand_total' } } }
                 ]),
                 Product.find({ status: 'enabled', stock: { $gt: 0, $lte: threshold } })
@@ -130,8 +228,192 @@ class WELLNESS_ADMIN {
                 Product.find({ status: 'enabled', stock: { $lte: 0 } })
                     .sort({ updated_at: -1 })
                     .limit(10)
-                    .select('productId product_name sku stock is_hidden')
+                    .select('productId product_name sku stock is_hidden'),
+                CommerceOrder.aggregate([
+                    { $match: packageMatch },
+                    {
+                        $group: {
+                            _id: null,
+                            count: { $sum: 1 },
+                            amount: { $sum: '$grand_total' },
+                            bv: { $sum: '$bv' },
+                            todayCount: { $sum: { $cond: [todayCond, 1, 0] } },
+                            todayAmount: { $sum: { $cond: [todayCond, '$grand_total', 0] } },
+                            todayBv: { $sum: { $cond: [todayCond, '$bv', 0] } }
+                        }
+                    }
+                ]),
+                CommerceOrder.aggregate([
+                    { $match: orderValidMatch },
+                    {
+                        $group: {
+                            _id: null,
+                            bv: { $sum: '$bv' },
+                            todayBv: { $sum: { $cond: [todayCond, '$bv', 0] } }
+                        }
+                    }
+                ]),
+                incomeSlugs.length
+                    ? Transaction.aggregate([
+                        { $match: incomeMatch },
+                        {
+                            $group: {
+                                _id: '$source',
+                                totalAmount: { $sum: '$amount' },
+                                todayAmount: {
+                                    $sum: { $cond: [todayTxCond, '$amount', 0] }
+                                },
+                                count: { $sum: 1 },
+                                todayCount: { $sum: { $cond: [todayTxCond, 1, 0] } }
+                            }
+                        }
+                    ])
+                    : Promise.resolve([]),
+                Distributor.countDocuments({ status: 'active' }),
+                Distributor.countDocuments({ status: 'inactive' }),
+                Distributor.countDocuments({
+                    joining_date: { $gte: todayStart, $lte: todayEnd }
+                }),
+                Distributor.countDocuments({
+                    status: 'active',
+                    activation_date: { $gte: todayStart, $lte: todayEnd }
+                }),
+                CommerceOrder.aggregate([
+                    {
+                        $match: {
+                            ...orderValidMatch,
+                            created_date: { $gte: rangeStart }
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: {
+                                $dateToString: {
+                                    format: '%Y-%m-%d',
+                                    date: '$created_date',
+                                    timezone: 'Asia/Kolkata'
+                                }
+                            },
+                            orders: { $sum: 1 },
+                            amount: { $sum: '$grand_total' },
+                            bv: { $sum: '$bv' }
+                        }
+                    },
+                    { $sort: { _id: 1 } }
+                ]),
+                incomeSlugs.length
+                    ? Transaction.aggregate([
+                        {
+                            $match: {
+                                ...incomeMatch,
+                                time: { $gte: rangeStart }
+                            }
+                        },
+                        {
+                            $group: {
+                            _id: {
+                                $dateToString: {
+                                    format: '%Y-%m-%d',
+                                    date: '$time',
+                                    timezone: 'Asia/Kolkata'
+                                }
+                            },
+                                amount: { $sum: '$amount' },
+                                count: { $sum: 1 }
+                            }
+                        },
+                        { $sort: { _id: 1 } }
+                    ])
+                    : Promise.resolve([]),
+                Distributor.aggregate([
+                    { $match: { joining_date: { $gte: rangeStart } } },
+                    {
+                        $group: {
+                            _id: {
+                                $dateToString: {
+                                    format: '%Y-%m-%d',
+                                    date: '$joining_date',
+                                    timezone: 'Asia/Kolkata'
+                                }
+                            },
+                            joined: { $sum: 1 }
+                        }
+                    },
+                    { $sort: { _id: 1 } }
+                ]),
+                Distributor.aggregate([
+                    {
+                        $match: {
+                            status: 'active',
+                            activation_date: { $gte: rangeStart, $ne: null }
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: {
+                                $dateToString: {
+                                    format: '%Y-%m-%d',
+                                    date: '$activation_date',
+                                    timezone: 'Asia/Kolkata'
+                                }
+                            },
+                            activated: { $sum: 1 }
+                        }
+                    },
+                    { $sort: { _id: 1 } }
+                ]),
+                CommerceOrder.aggregate([
+                    { $match: orderValidMatch },
+                    {
+                        $group: {
+                            _id: '$order_type',
+                            count: { $sum: 1 },
+                            amount: { $sum: '$grand_total' }
+                        }
+                    }
+                ])
             ]);
+
+            const pkg = packagePurchaseAgg[0] || {};
+            const bvAll = bvPurchaseAgg[0] || {};
+
+            const incomeItems = incomeSlugs.map((slug) => {
+                const hit = incomeByTypeAgg.find((row) => row._id === slug);
+                return {
+                    slug,
+                    name: incomeNameMap[slug] || slug,
+                    totalAmount: round2(hit?.totalAmount),
+                    todayAmount: round2(hit?.todayAmount),
+                    count: Number(hit?.count) || 0,
+                    todayCount: Number(hit?.todayCount) || 0
+                };
+            });
+
+            const incomeTotal = {
+                totalAmount: round2(incomeItems.reduce((s, i) => s + i.totalAmount, 0)),
+                todayAmount: round2(incomeItems.reduce((s, i) => s + i.todayAmount, 0))
+            };
+
+            const joinedMap = Object.fromEntries(
+                usersJoinedSeriesAgg.map((row) => [row._id, Number(row.joined) || 0])
+            );
+            const activeMap = Object.fromEntries(
+                usersActiveSeriesAgg.map((row) => [row._id, Number(row.activated) || 0])
+            );
+
+            const usersSeries = dayKeys.map(({ key, label }) => ({
+                date: key,
+                label,
+                joined: joinedMap[key] || 0,
+                activated: activeMap[key] || 0
+            }));
+
+            const orderTypeLabels = {
+                franchise_purchase: 'Franchise',
+                distributor_purchase: 'Distributor',
+                theme_purchase: 'Theme',
+                distributor_package_purchase: 'Package'
+            };
 
             return res.status(200).json({
                 status: 200,
@@ -140,17 +422,66 @@ class WELLNESS_ADMIN {
                     franchises: franchiseCount,
                     distributors: distributorCount,
                     theme_users: themeUserCount,
-                    packages: packageCount,
+                    packages: packageCatalogCount,
                     products: productCount,
                     orders: orderCount,
                     low_stock: lowStockCount,
                     out_of_stock: outOfStockCount,
                     pending_orders: pendingOrders,
                     delivered_orders: deliveredOrders,
-                    revenue: revenueAgg[0]?.revenue || 0,
+                    revenue: round2(revenueAgg[0]?.revenue),
                     low_stock_products: lowStockProducts,
                     out_of_stock_products: outOfStockProducts,
-                    low_stock_threshold: threshold
+                    low_stock_threshold: threshold,
+
+                    package_purchases: {
+                        totalCount: Number(pkg.count) || 0,
+                        todayCount: Number(pkg.todayCount) || 0,
+                        totalAmount: round2(pkg.amount),
+                        todayAmount: round2(pkg.todayAmount),
+                        totalBv: round2(pkg.bv),
+                        todayBv: round2(pkg.todayBv)
+                    },
+                    bv_purchasing: {
+                        totalBv: round2(bvAll.bv),
+                        todayBv: round2(bvAll.todayBv),
+                        packageTotalBv: round2(pkg.bv),
+                        packageTodayBv: round2(pkg.todayBv)
+                    },
+                    income: {
+                        total: incomeTotal,
+                        by_type: incomeItems
+                    },
+                    users: {
+                        total: distributorCount,
+                        active: usersActive,
+                        inactive: usersInactive,
+                        todayJoined: usersTodayJoined,
+                        todayActivated: usersTodayActive
+                    },
+                    charts: {
+                        days: chartDays,
+                        orders: fillSeries(dayKeys, orderSeriesAgg, ['orders', 'amount', 'bv']),
+                        income: fillSeries(dayKeys, incomeSeriesAgg, ['amount', 'count']),
+                        users: usersSeries,
+                        income_pie: incomeItems
+                            .filter((item) => item.totalAmount > 0)
+                            .map((item) => ({
+                                name: item.name,
+                                slug: item.slug,
+                                value: item.totalAmount,
+                                today: item.todayAmount
+                            })),
+                        order_type_pie: orderTypePieAgg.map((row) => ({
+                            name: orderTypeLabels[row._id] || row._id || 'Other',
+                            value: Number(row.count) || 0,
+                            amount: round2(row.amount)
+                        })),
+                        users_pie: [
+                            { name: 'Active', value: usersActive },
+                            { name: 'Inactive', value: usersInactive }
+                        ].filter((item) => item.value > 0)
+                    }
                 }
             });
         } catch (error) {

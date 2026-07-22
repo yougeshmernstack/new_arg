@@ -23,7 +23,7 @@ const {
     INVALID_USERNAME,
     INVALID_SPONSOR
 } = require('../../utils/errorMessages');
-const { buildTeamSummary, buildBinarySummary } = require('./Team');
+const { buildTeamSummary, buildBinarySummary, buildRepurchaseSummary } = require('./Team');
 
 /**
  * Income Overview: every active income wallet on the distributor
@@ -367,6 +367,7 @@ class DISTRIBUTOR_AUTH {
             const team = await buildTeamSummary(uid);
             const income = await buildIncomeSummary(uid);
             const binary = await buildBinarySummary(uid);
+            const repurchase = await buildRepurchaseSummary(uid);
 
             return res.status(200).json({
                 status: 200,
@@ -377,8 +378,111 @@ class DISTRIBUTOR_AUTH {
                     wallet,
                     team,
                     income,
-                    binary
+                    binary,
+                    repurchase
                 }
+            });
+        } catch (error) {
+            errorLogger(error);
+            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
+        }
+    }
+
+    /**
+     * Credit history for one income wallet slug (e.g. direct_income).
+     */
+    async getIncomeHistory(req, res) {
+        try {
+            const { uid } = req.user;
+            const slug = String(req.query.slug || '').trim();
+            const page = Math.max(1, Number(req.query.page) || 1);
+            const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+
+            if (!slug) {
+                return res.status(400).json({ status: 400, message: 'Income slug is required.' });
+            }
+
+            const catalog = await Wallets.findOne({
+                slug,
+                status: 1,
+                wallet_type: 'income'
+            }).lean();
+
+            if (!catalog) {
+                return res.status(404).json({ status: 404, message: 'Income type not found.' });
+            }
+
+            await ensureWalletSlug(DistributorWallet, uid, slug);
+            const walletDoc = await DistributorWallet.findOne(
+                { uid: Number(uid), 'wallets.slug': slug },
+                { 'wallets.$': 1 }
+            ).lean();
+            const walletEntry = walletDoc?.wallets?.[0];
+            const balance = Math.round((Number(walletEntry?.value) || 0) * 100) / 100;
+
+            const match = {
+                uid: Number(uid),
+                panel: 'distributor',
+                source: slug,
+                debit_credit: 'credit',
+                status: { $ne: 2 }
+            };
+
+            const [total, rows, sumRows] = await Promise.all([
+                Transaction.countDocuments(match),
+                Transaction.find(match)
+                    .sort({ time: -1, createdAt: -1 })
+                    .skip((page - 1) * limit)
+                    .limit(limit)
+                    .select(
+                        'tx_Id amount debit_credit source wallet_type tx_type remark time status to_from to_from_username level income_percent business order_Id metadata createdAt'
+                    )
+                    .lean(),
+                Transaction.aggregate([
+                    { $match: match },
+                    { $group: { _id: null, totalAmount: { $sum: '$amount' }, count: { $sum: 1 } } }
+                ])
+            ]);
+
+            const creditedTotal = Math.round((Number(sumRows[0]?.totalAmount) || 0) * 100) / 100;
+
+            return res.status(200).json({
+                status: 200,
+                message: 'Income history fetched.',
+                data: {
+                    slug,
+                    label: catalog.name || slug,
+                    balance,
+                    creditedTotal,
+                    creditCount: Number(sumRows[0]?.count) || 0,
+                    items: rows
+                },
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    pages: Math.max(1, Math.ceil(total / limit))
+                }
+            });
+        } catch (error) {
+            errorLogger(error);
+            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
+        }
+    }
+
+    async getDashboardBanners(req, res) {
+        try {
+            const DashboardBanner = require('../../MODALS/DashboardBanner');
+            const { BANNER_WIDTH, BANNER_HEIGHT } = require('../../MODALS/DashboardBanner');
+            const list = await DashboardBanner.find({ status: 'active' })
+                .sort({ sortOrder: 1, created_at: -1 })
+                .select('bannerId title imageUrl linkUrl sortOrder')
+                .lean();
+            return res.status(200).json({
+                status: 200,
+                message: 'Dashboard banners fetched.',
+                data: list,
+                meta: { width: BANNER_WIDTH, height: BANNER_HEIGHT }
             });
         } catch (error) {
             errorLogger(error);

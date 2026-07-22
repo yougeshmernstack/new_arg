@@ -3,5 +3,5 @@ import App from './App';
 
 test('renders login heading', () => {
   render(<App />);
-  expect(screen.getByText(/Franchise Panel/i)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /Franchise Panel/i })).toBeInTheDocument();
 });

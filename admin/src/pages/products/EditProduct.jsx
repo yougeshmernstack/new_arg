@@ -106,6 +106,7 @@ export default function EditProduct() {
         mrp: Number(form.mrp),
         distributor_price: Number(form.distributor_price),
         franchise_price: Number(form.franchise_price),
+        bv: Number(form.bv),
         gst: Number(form.gst),
         weight: form.weight,
         status: form.status,
@@ -169,6 +170,10 @@ export default function EditProduct() {
           <label>
             Franchise price
             <input type="number" value={form.franchise_price ?? 0} onChange={onChange('franchise_price')} />
+          </label>
+          <label>
+            BV (repurchase)
+            <input type="number" min="0" value={form.bv ?? 0} onChange={onChange('bv')} />
           </label>
           <label>
             GST %

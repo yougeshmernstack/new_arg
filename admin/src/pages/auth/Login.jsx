@@ -16,6 +16,8 @@ export default function Login() {
     return <Navigate to="/" replace />;
   }
 
+  const brandInitial = String(APP_NAME || 'A').trim().charAt(0).toUpperCase() || 'A';
+
   const onChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -35,8 +37,15 @@ export default function Login() {
   return (
     <div className="auth-page">
       <form className="auth-card" onSubmit={onSubmit}>
-        <h1>{APP_NAME}</h1>
-        <p className="auth-sub">Sign in to continue</p>
+        <div className="auth-brand">
+          <div className="auth-brand-mark" aria-hidden="true">
+            {brandInitial}
+          </div>
+          <div>
+            <h1>{APP_NAME}</h1>
+            <p className="auth-sub">Sign in to the admin console</p>
+          </div>
+        </div>
         {error ? <div className="alert error">{error}</div> : null}
         <label>
           Username
@@ -70,7 +79,7 @@ export default function Login() {
           </div>
         </label>
         <button type="submit" className="btn primary" disabled={loading}>
-          {loading ? 'Signing in...' : 'Login'}
+          {loading ? 'Signing in...' : 'Sign in'}
         </button>
       </form>
     </div>

@@ -4,6 +4,7 @@ const cors = require("cors");
 const authenticator = require("../utils/authuser");
 const { ThemeAuth } = require("../API/THEME/Auth");
 const Storefront = require("../API/COMMERCE/Storefront");
+const ThemeCatalog = require("../API/THEME/Catalog");
 
 var theme = express.Router();
 var jsonParser = bodyParser.json();
@@ -22,6 +23,14 @@ theme.get('/get-dashboard', ThemeAuth.getDashboard);
 theme.get('/get-profile', ThemeAuth.getProfile);
 theme.post('/update-profile', ThemeAuth.updateProfile);
 theme.post('/change-password', ThemeAuth.changePassword);
+
+// Public catalog / CMS (roles: public — no income fields)
+theme.get('/get-site-content', ThemeCatalog.getSiteContent);
+theme.get('/get-legal-documents', ThemeCatalog.getLegalDocuments);
+theme.get('/catalog-products', ThemeCatalog.listProducts);
+theme.get('/catalog-product', ThemeCatalog.getProduct);
+theme.get('/catalog-packages', ThemeCatalog.listPackages);
+theme.get('/catalog-package', ThemeCatalog.getPackage);
 
 theme.get('/get-products', Storefront.listProducts);
 theme.get('/get-product', Storefront.getProduct);

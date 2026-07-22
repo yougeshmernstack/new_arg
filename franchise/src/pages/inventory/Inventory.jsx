@@ -69,8 +69,9 @@ export default function Inventory() {
     <div className="page">
       <div className="page-head">
         <div>
+          <p className="page-kicker">Warehouse</p>
           <h2>Inventory</h2>
-          <p style={{ margin: '0.35rem 0 0', color: 'var(--muted)' }}>
+          <p className="page-sub">
             Product-wise stock in your franchise warehouse
           </p>
         </div>

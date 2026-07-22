@@ -18,7 +18,16 @@ const AuditService = require("../SERVICES/AuditService");
 const wellnessPermissionSeed = require("../SERVICES/WellnessPermissionSeed");
 const mediaUpload = require("../utils/mediaUpload");
 const paymentUpload = require("../utils/paymentUpload");
+const websiteUpload = require("../utils/websiteUpload");
+const legalUpload = require("../utils/legalUpload");
+const bannerUpload = require("../utils/bannerUpload");
 const PaymentSettings = require("../API/ADMIN/PaymentSettings");
+const DummyBusinessAdmin = require("../API/ADMIN/DummyBusinessAdmin");
+const WebsiteAdmin = require("../API/ADMIN/WebsiteAdmin");
+const KycAdmin = require("../API/ADMIN/KycAdmin");
+const PayoutReportAdmin = require("../API/ADMIN/PayoutReportAdmin");
+const WithdrawalAdmin = require("../API/ADMIN/WithdrawalAdmin");
+const RankRewardAdmin = require("../API/ADMIN/RankRewardAdmin");
 var admin = express.Router();
 var jsonParser = bodyParser.json();
 admin.use(jsonParser);
@@ -90,5 +99,46 @@ admin.post('/approve-fund-deposit', PaymentSettings.approveFundDeposit);
 admin.post('/reject-fund-deposit', PaymentSettings.rejectFundDeposit);
 admin.post('/send-fund', PaymentSettings.sendFund);
 admin.get('/get-send-fund-history', PaymentSettings.getSendFundHistory);
+
+// ===== Dummy Business (Binary BV power volume — recipient only) =====
+admin.post('/grant-dummy-business', DummyBusinessAdmin.grantDummyBusiness);
+admin.get('/get-dummy-business-history', DummyBusinessAdmin.getDummyBusinessHistory);
+
+// ===== Distributor KYC =====
+admin.get('/get-kyc-list', KycAdmin.getKycList);
+admin.get('/get-kyc', KycAdmin.getKyc);
+admin.post('/approve-kyc', KycAdmin.approveKyc);
+admin.post('/reject-kyc', KycAdmin.rejectKyc);
+
+// ===== Distributor Withdrawals =====
+admin.get('/get-withdrawals', WithdrawalAdmin.getWithdrawals);
+admin.post('/approve-withdrawal', WithdrawalAdmin.approveWithdrawal);
+admin.post('/reject-withdrawal', WithdrawalAdmin.rejectWithdrawal);
+
+// ===== Payout / Income Report =====
+admin.get('/payout-report', PayoutReportAdmin.getSummary);
+admin.get('/get-payout-report-detail', PayoutReportAdmin.getBySlug);
+
+// ===== Rank Achievements (Reward / Royality / Traveling) =====
+admin.get('/get-reward-achievements', RankRewardAdmin.getRewardList);
+admin.get('/get-royality-achievements', RankRewardAdmin.getRoyalityList);
+admin.get('/get-traveling-achievements', RankRewardAdmin.getTravelingList);
+admin.post('/mark-rank-complete', RankRewardAdmin.markComplete);
+
+// ===== Website CMS (theme storefront content) =====
+admin.get('/get-website-content', WebsiteAdmin.getWebsiteContent);
+admin.post('/update-website-content', WebsiteAdmin.updateWebsiteContent);
+admin.post('/upload-website-media', websiteUpload.single('file'), WebsiteAdmin.uploadWebsiteMedia);
+admin.get('/get-legal-documents', WebsiteAdmin.getLegalDocuments);
+admin.get('/get-legal-document', WebsiteAdmin.getLegalDocument);
+admin.post('/create-legal-document', WebsiteAdmin.createLegalDocument);
+admin.post('/update-legal-document', WebsiteAdmin.updateLegalDocument);
+admin.post('/toggle-legal-document-status', WebsiteAdmin.toggleLegalDocumentStatus);
+admin.post('/upload-legal-pdf', legalUpload.single('file'), WebsiteAdmin.uploadLegalPdf);
+admin.get('/get-dashboard-banners', WebsiteAdmin.getDashboardBanners);
+admin.post('/create-dashboard-banner', WebsiteAdmin.createDashboardBanner);
+admin.post('/update-dashboard-banner', WebsiteAdmin.updateDashboardBanner);
+admin.post('/toggle-dashboard-banner-status', WebsiteAdmin.toggleDashboardBannerStatus);
+admin.post('/upload-dashboard-banner', bannerUpload.single('file'), WebsiteAdmin.uploadDashboardBanner);
 
 module.exports = admin;

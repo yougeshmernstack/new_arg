@@ -19,6 +19,10 @@ import TeamList from '../pages/team/TeamList';
 import BinaryTeam from '../pages/team/BinaryTeam';
 import BinaryLegList from '../pages/team/BinaryLegList';
 import FundWallet from '../pages/wallet/FundWallet';
+import Withdraw from '../pages/wallet/Withdraw';
+import Kyc from '../pages/kyc/Kyc';
+import IncomeHistory from '../pages/income/IncomeHistory';
+import RankProgress from '../pages/rewards/RankProgress';
 
 export default function AppRoutes() {
   return (
@@ -29,7 +33,10 @@ export default function AppRoutes() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route index element={<Dashboard />} />
+            <Route path="income/:slug" element={<IncomeHistory />} />
             <Route path="fund-wallet" element={<FundWallet />} />
+            <Route path="withdraw" element={<Withdraw />} />
+            <Route path="kyc" element={<Kyc />} />
             <Route path="packages" element={<Packages />} />
             <Route path="packages/:packageId/checkout" element={<PackageCheckout />} />
             <Route path="products" element={<Products />} />
@@ -43,6 +50,9 @@ export default function AppRoutes() {
             <Route path="team/left" element={<BinaryLegList side="left" />} />
             <Route path="team/right" element={<BinaryLegList side="right" />} />
             <Route path="team/binary" element={<BinaryTeam />} />
+            <Route path="rewards" element={<RankProgress type="reward" />} />
+            <Route path="royality" element={<RankProgress type="royality" />} />
+            <Route path="traveling" element={<RankProgress type="traveling" />} />
             <Route path="profile" element={<Profile />} />
             <Route path="change-password" element={<ChangePassword />} />
             <Route path="notifications" element={<Notifications />} />

@@ -1,86 +1,139 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { SectionHeader } from "@/components/SectionHeader";
-import { brand } from "@/data/brand";
+import { getSiteBrand } from "@/lib/siteContent";
+import { brand as fallbackBrand } from "@/data/brand";
 
 export const metadata: Metadata = {
-  title: `About Us | ${brand.name}`,
-  description: `Learn about ${brand.name} — our mission, vision, values, and commitment to natural wellness.`
+  title: `About Us | ${fallbackBrand.name}`,
+  description: `Learn about ${fallbackBrand.name} — our mission, vision, values, founders, and commitment to natural wellness.`,
 };
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const brand = await getSiteBrand();
+  const founders = brand.founders.filter((f) => f.name);
+
   return (
-    <>
-      <section className="page-hero company-hero">
-        <p className="eyebrow">About company</p>
-        <h1>Nature&apos;s path to healthy living</h1>
-        <p>{brand.description}</p>
+    <div className="about-page">
+      <section className="about-hero">
+        <div className="about-hero-inner">
+          <p className="eyebrow">About us</p>
+          <h1>
+            Nature&apos;s path
+            <span>to healthy living</span>
+          </h1>
+          <p className="about-hero-lede">{brand.description}</p>
+          <div className="about-hero-meta">
+            <span>{brand.tagline}</span>
+            <Link href="/products">Shop products →</Link>
+            <Link href="/contact">Contact →</Link>
+          </div>
+        </div>
       </section>
 
-      <section className="section company-intro">
-        <div className="company-copy">
+      <section className="section about-story">
+        <div className="about-story-copy">
+          <p className="eyebrow">Our story</p>
           <h2>About {brand.name}</h2>
           {brand.aboutExtended.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}
+          {brand.howItWasBuilt ? (
+            <div className="about-built">
+              <h3>How it was built</h3>
+              <p>{brand.howItWasBuilt}</p>
+            </div>
+          ) : null}
         </div>
-        <aside className="company-sidebar">
-          <div className="sidebar-block">
-            <span className="sidebar-icon" aria-hidden="true">
-              ◎
-            </span>
-            <h3>Our Mission</h3>
+        <div className="about-mv">
+          <article className="about-mv-item">
+            <p className="eyebrow">Mission</p>
+            <h3>What we do</h3>
             <p>{brand.mission}</p>
-          </div>
-          <div className="sidebar-block">
-            <span className="sidebar-icon" aria-hidden="true">
-              ◉
-            </span>
-            <h3>Our Vision</h3>
+          </article>
+          <article className="about-mv-item">
+            <p className="eyebrow">Vision</p>
+            <h3>Where we&apos;re going</h3>
             <p>{brand.vision}</p>
-          </div>
-          <div className="sidebar-block">
-            <span className="sidebar-icon" aria-hidden="true">
-              ♡
-            </span>
-            <h3>Our Values</h3>
-            <ul>
-              {brand.values.map((value) => (
-                <li key={value.label}>
-                  <strong>{value.label}</strong> — {value.description}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </aside>
-      </section>
-
-      <section className="section section-white">
-        <SectionHeader
-          eyebrow="What we stand for"
-          title="Natural, pure, and responsible"
-          description="The principles that guide every Arogya Greenlife product."
-        />
-        <div className="pillar-grid">
-          {brand.pillars.map((pillar) => (
-            <article className="pillar-card" key={pillar.label}>
-              <span className="pillar-dot" aria-hidden="true" />
-              <h3>{pillar.label}</h3>
-              <p>{pillar.description}</p>
-            </article>
-          ))}
+          </article>
         </div>
       </section>
 
-      <section className="section section-tinted">
-        <SectionHeader
-          eyebrow="What we offer"
-          title="Wellness products for everyday health"
-          description="A wide range of wellness products made with natural goodness."
-        />
-        <div className="offering-grid">
+      <section className="section about-values">
+        <div className="about-section-head">
+          <p className="eyebrow">Values</p>
+          <h2>What guides us</h2>
+        </div>
+        <ul className="about-values-list">
+          {brand.values.map((value) => (
+            <li key={value.label}>
+              <strong>{value.label}</strong>
+              <span>{value.description}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {founders.length > 0 ? (
+        <section className="section about-founders">
+          <div className="about-section-head">
+            <p className="eyebrow">Our people</p>
+            <h2>The founders</h2>
+            <p className="about-section-lede">The people who built this company.</p>
+          </div>
+          <div className={`about-founder-grid${founders.length === 1 ? " is-single" : ""}`}>
+            {founders.map((founder) => (
+              <article className="about-founder" key={founder.name}>
+                {founder.photoUrl ? (
+                  <Image
+                    className="about-founder-photo"
+                    src={founder.photoUrl}
+                    alt={founder.name}
+                    width={480}
+                    height={560}
+                    unoptimized={founder.photoUrl.startsWith("http")}
+                  />
+                ) : (
+                  <div className="about-founder-photo about-founder-placeholder" aria-hidden="true" />
+                )}
+                <div className="about-founder-copy">
+                  <h3>{founder.name}</h3>
+                  {founder.role ? <p className="about-founder-role">{founder.role}</p> : null}
+                  {founder.bio ? <p>{founder.bio}</p> : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="section about-pillars">
+        <div className="about-section-head">
+          <p className="eyebrow">What we stand for</p>
+          <h2>Natural, pure, and responsible</h2>
+          <p className="about-section-lede">The principles behind every {brand.name} product.</p>
+        </div>
+        <ol className="about-pillar-list">
+          {brand.pillars.map((pillar, index) => (
+            <li key={pillar.label}>
+              <span className="about-pillar-num">{String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <h3>{pillar.label}</h3>
+                <p>{pillar.description}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="section about-offerings">
+        <div className="about-section-head">
+          <p className="eyebrow">What we offer</p>
+          <h2>Wellness for everyday health</h2>
+        </div>
+        <div className="about-offering-grid">
           {brand.offerings.map((offering) => (
-            <article className="offering-card" key={offering.title}>
+            <article key={offering.title}>
               <h3>{offering.title}</h3>
               <p>{offering.description}</p>
             </article>
@@ -88,12 +141,12 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="section commitment-section">
-        <div className="commitment-card">
-          <p className="eyebrow light">Our commitment</p>
+      <section className="section about-commit">
+        <div className="about-commit-inner">
+          <p className="eyebrow">Our commitment</p>
           <h2>Live Well. Live Green.</h2>
           <p>{brand.commitment}</p>
-          <div className="hero-actions">
+          <div className="about-commit-actions">
             <Link className="button button-light" href="/products">
               Shop products
             </Link>
@@ -103,6 +156,6 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }

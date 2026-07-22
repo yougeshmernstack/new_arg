@@ -27,6 +27,7 @@ const { default: axios } = require('axios');
 const port = process.env.PORT;
 const path = require('path');
 const { sendEmail } = require('./SERVICES/EmailService');
+const roiClosing = require('./SERVICES/Roi');
 var jsonParser = bodyParser.json();
 app.use(jsonParser)
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -117,6 +118,16 @@ function sendDataToUser(userId, data) {
         // });
 app.get('/project_setup', async (req, res) => {
     res.json({ DATA: 'RES'})
+});
+
+app.get('/matching_income_closing', async (req, res) => {
+    const matchingIncome = await roiClosing.matchingIncomeClosing();
+    res.json({ DATA: matchingIncome });
+});
+
+app.get('/upline_matching_income_closing', async (req, res) => {
+    const uplineMatching = await roiClosing.uplineMatchingIncomeClosing();
+    res.json({ DATA: uplineMatching });
 });
 
 setupWebSocket(server);

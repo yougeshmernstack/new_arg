@@ -17,4 +17,7 @@ export const walletApi = {
         return data;
       }],
     }),
+  getWithdrawInfo: () => api.get('/get-withdraw-info'),
+  requestWithdraw: (payload) => api.post('/request-withdraw', payload),
+  getWithdrawHistory: (params) => api.get('/get-withdraw-history', { params }),
 };

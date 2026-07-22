@@ -4,6 +4,14 @@ const AdminData = require('../../MODALS/AdminData');
 const { errorLogger } = require('../../utils/logger');
 const { INTERNAL_SERVER_ERROR } = require('../../utils/errorMessages');
 const { getChild } = require('../../SERVICES/BinaryPlacement');
+const {
+    calculate2to1Match,
+    getConsumedBv
+} = require('../../SERVICES/BinaryMatching');
+const {
+    getAvailableRepurchaseVolumes,
+    calculateRepurchaseMatch
+} = require('../../SERVICES/RepurchaseMatching');
 
 function sanitizeMember(doc, extras = {}) {
     const obj = doc.toObject ? doc.toObject() : { ...doc };
@@ -239,20 +247,22 @@ async function sumBinaryLegBv(rootChildUid) {
 
 /**
  * Binary BV snapshot for distributor dashboard.
- * Left/Right BV = live team package_bv on each leg (carry fields used when matching updates them).
+ * Left/Right BV = live team package_bv on each leg.
  * Dummy BV = admin/power volume stored on distributor.
- * Match BV = weaker leg after adding dummy (current pairable volume).
+ * Match BV (hero) = lifetime matched from closings; also returns closed BV total.
+ * pairable_bv = current pairable volume under 1:1 × 1250 after prior consumption.
  */
 async function buildBinarySummary(uid) {
     const myUid = Number(uid);
     const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
-    const [me, leftChild, rightChild] = await Promise.all([
+    const [me, leftChild, rightChild, consumed] = await Promise.all([
         Distributor.findOne({ uid: myUid }).select(
             'left_bv right_bv match_bv left_dummy_bv right_dummy_bv package_bv'
         ),
         getChild(myUid, 'left'),
-        getChild(myUid, 'right')
+        getChild(myUid, 'right'),
+        getConsumedBv(myUid)
     ]);
 
     const [leftTeamBv, rightTeamBv] = await Promise.all([
@@ -269,17 +279,50 @@ async function buildBinarySummary(uid) {
 
     const leftTotal = round2(leftBv + leftDummyBv);
     const rightTotal = round2(rightBv + rightDummyBv);
-    const storedMatch = round2(me?.match_bv);
-    const matchBv = storedMatch > 0 ? storedMatch : Math.min(leftTotal, rightTotal);
+    const leftConsumed = round2(consumed?.left || 0);
+    const rightConsumed = round2(consumed?.right || 0);
+    const matchedTotal = round2(consumed?.matched || 0);
+    // Volume removed across all closings (includes equal-cut on left)
+    const closedBv = round2(leftConsumed + rightConsumed);
+    const leftAvail = round2(Math.max(0, leftTotal - leftConsumed));
+    const rightAvail = round2(Math.max(0, rightTotal - rightConsumed));
+    const pairableBv = round2(calculate2to1Match(leftAvail, rightAvail).matched_bv);
 
     return {
         left_bv: leftBv,
         right_bv: rightBv,
-        match_bv: matchBv,
+        // Lifetime totals — fill when matching closing runs
+        match_bv: matchedTotal,
+        closed_bv: closedBv,
+        matched_bv: matchedTotal,
+        // Still available for next close
+        pairable_bv: pairableBv,
         left_dummy_bv: leftDummyBv,
         right_dummy_bv: rightDummyBv,
         left_total_bv: leftTotal,
-        right_total_bv: rightTotal
+        right_total_bv: rightTotal,
+        left_available_bv: leftAvail,
+        right_available_bv: rightAvail
+    };
+}
+
+/**
+ * Repurchase Matching BV snapshot — product purchases only, no dummy.
+ * Match BV uses 1:1 × 500 cut.
+ */
+async function buildRepurchaseSummary(uid) {
+    const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+    const volumes = await getAvailableRepurchaseVolumes(uid);
+    const matchBv = round2(
+        calculateRepurchaseMatch(volumes.leftAvail, volumes.rightAvail).matched_bv
+    );
+
+    return {
+        left_bv: volumes.leftTeamBv,
+        right_bv: volumes.rightTeamBv,
+        match_bv: matchBv,
+        left_available_bv: volumes.leftAvail,
+        right_available_bv: volumes.rightAvail
     };
 }
 
@@ -497,3 +540,4 @@ const DistributorTeam = new DISTRIBUTOR_TEAM();
 module.exports = DistributorTeam;
 module.exports.buildTeamSummary = buildTeamSummary;
 module.exports.buildBinarySummary = buildBinarySummary;
+module.exports.buildRepurchaseSummary = buildRepurchaseSummary;

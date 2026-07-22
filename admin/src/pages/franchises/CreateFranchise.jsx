@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { wellnessApi } from '../../api';
 
 const initial = {
@@ -10,6 +10,16 @@ const initial = {
   email: '',
   mobile: '',
   gst_number: '',
+};
+
+const labels = {
+  username: 'Username',
+  password: 'Password',
+  business_name: 'Business name',
+  owner_name: 'Owner name',
+  email: 'Email',
+  mobile: 'Mobile',
+  gst_number: 'GST number',
 };
 
 export default function CreateFranchise() {
@@ -41,18 +51,29 @@ export default function CreateFranchise() {
 
   return (
     <div className="page">
-      <h2>Create Franchise</h2>
+      <div className="page-head">
+        <div>
+          <h2>Create Franchise</h2>
+          <p className="page-sub">Add a new franchise partner and login credentials</p>
+        </div>
+        <Link className="btn ghost" to="/franchises">
+          ← Back
+        </Link>
+      </div>
+
       {error ? <div className="alert error">{error}</div> : null}
       {success ? <div className="alert success">{success}</div> : null}
-      <form className="form-grid" onSubmit={onSubmit}>
+
+      <form className="form-grid" onSubmit={onSubmit} style={{ maxWidth: 760 }}>
         {Object.keys(initial).map((key) => (
           <label key={key}>
-            {key.replaceAll('_', ' ')}
+            {labels[key] || key.replaceAll('_', ' ')}
             <input
               name={key}
-              type={key === 'password' ? 'password' : 'text'}
+              type={key === 'password' ? 'password' : key === 'email' ? 'email' : 'text'}
               value={form[key]}
               onChange={onChange}
+              autoComplete={key === 'password' ? 'new-password' : 'off'}
               required={['username', 'password', 'business_name', 'owner_name'].includes(key)}
             />
           </label>
@@ -62,7 +83,7 @@ export default function CreateFranchise() {
             Cancel
           </button>
           <button type="submit" className="btn primary" disabled={loading}>
-            {loading ? 'Creating...' : 'Create'}
+            {loading ? 'Creating...' : 'Create franchise'}
           </button>
         </div>
       </form>

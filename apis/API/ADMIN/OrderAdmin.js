@@ -1,6 +1,7 @@
 const CommerceOrder = require('../../MODALS/CommerceOrder');
 const Invoice = require('../../MODALS/Invoice');
 const Product = require('../../MODALS/Product');
+const Distributor = require('../../MODALS/Distributor');
 const StockHistory = require('../../MODALS/StockHistory');
 const AuditService = require('../../SERVICES/AuditService');
 const CommerceService = require('../../SERVICES/CommerceService');
@@ -170,6 +171,19 @@ class ORDER_ADMIN {
                             created_by: req.user.uid
                         }).save();
                     }
+                }
+
+                // Reverse repurchase BV credited on distributor product purchase
+                if (
+                    order.order_type === 'distributor_purchase' &&
+                    order.repurchase_bv_credited &&
+                    Number(order.bv) > 0
+                ) {
+                    await Distributor.updateOne(
+                        { uid: order.buyer_uid },
+                        { $inc: { repurchase_bv: -Math.abs(Number(order.bv) || 0) } }
+                    );
+                    order.repurchase_bv_credited = false;
                 }
             }
 

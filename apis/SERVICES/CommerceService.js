@@ -288,6 +288,7 @@ class CommerceService {
         const orderItems = [];
         let subtotal = 0;
         let taxTotal = 0;
+        let orderBv = 0;
 
         try {
             for (const item of cart.items) {
@@ -328,6 +329,9 @@ class CommerceService {
                 const { base, tax, total } = calcItemTax(price, qty, updated.gst);
                 subtotal += base;
                 taxTotal += tax;
+                if (role === 'distributor') {
+                    orderBv += (Math.max(0, Number(updated.bv) || 0) * qty);
+                }
                 orderItems.push({
                     productId: updated.productId,
                     sku: updated.sku,
@@ -357,6 +361,7 @@ class CommerceService {
             const buyerMobile = buyer?.mobile || '';
 
             const grand_total = subtotal + taxTotal;
+            const roundedOrderBv = Math.round((orderBv || 0) * 100) / 100;
             const order = new CommerceOrder({
                 order_type: ORDER_TYPE_MAP[role],
                 buyer_uid: uid,
@@ -368,9 +373,11 @@ class CommerceService {
                 discount: 0,
                 tax: taxTotal,
                 grand_total,
+                bv: role === 'distributor' ? roundedOrderBv : 0,
                 payment_status: 'pending',
                 order_status: 'pending',
                 dispatch_status: 'pending',
+                repurchase_bv_credited: false,
                 shipping_address: {
                     name: shipping_address.name || buyerName,
                     mobile: shipping_address.mobile || buyerMobile,
@@ -393,6 +400,15 @@ class CommerceService {
             });
 
             await order.save();
+
+            if (role === 'distributor' && roundedOrderBv > 0) {
+                await Distributor.updateOne(
+                    { uid },
+                    { $inc: { repurchase_bv: roundedOrderBv } }
+                );
+                order.repurchase_bv_credited = true;
+                await order.save();
+            }
 
             const company = await CompanyInfo.findOne({}) || {};
             const invoice = new Invoice({

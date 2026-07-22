@@ -1,16 +1,21 @@
 :root {
-  --bg: #f3f5f8;
+  --bg: #eef3f1;
+  --bg-accent: #e4ece8;
   --surface: #ffffff;
-  --text: #152033;
-  --muted: #667085;
-  --line: #e4e7ec;
+  --text: #102a43;
+  --muted: #5a6d7d;
+  --line: #d7e0e6;
   --primary: #0f6e56;
-  --primary-dark: #0b5744;
+  --primary-dark: #0a4f3d;
+  --primary-soft: rgba(15, 110, 86, 0.1);
   --danger: #b42318;
   --success: #067647;
-  --shadow: 0 10px 30px rgba(16, 24, 40, 0.06);
-  --radius: 14px;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --shadow: 0 12px 28px rgba(16, 42, 67, 0.06);
+  --shadow-lg: 0 22px 48px rgba(16, 42, 67, 0.1);
+  --radius: 16px;
+  --radius-sm: 12px;
+  --font: "Space Grotesk", "Segoe UI", sans-serif;
+  font-family: var(--font);
 }
 
 * {
@@ -19,8 +24,13 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(ellipse 80% 50% at 100% -10%, rgba(15, 110, 86, 0.08), transparent 55%),
+    radial-gradient(ellipse 60% 40% at -5% 30%, rgba(16, 42, 67, 0.05), transparent 50%),
+    var(--bg);
   color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -29,7 +39,9 @@ a {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -37,19 +49,30 @@ input {
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text);
-  border-radius: 10px;
-  padding: 0.65rem 1rem;
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 1.05rem;
   cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease,
+    box-shadow 0.15s ease;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: #b7c5d0;
+  background: #f8fafb;
 }
 
 .btn.primary {
   background: var(--primary);
   border-color: var(--primary);
   color: #fff;
+  box-shadow: 0 8px 20px rgba(15, 110, 86, 0.22);
 }
 
-.btn.primary:hover {
+.btn.primary:hover:not(:disabled) {
   background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  transform: translateY(-1px);
 }
 
 .btn.ghost {
@@ -59,11 +82,31 @@ input {
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .page {
   display: grid;
-  gap: 1rem;
+  gap: 1.15rem;
+  animation: pageIn 0.35s ease-out both;
+}
+
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page {
+    animation: none;
+  }
 }
 
 .page-head {
@@ -71,25 +114,48 @@ input {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .page h2 {
   margin: 0;
+  font-size: clamp(1.35rem, 2.4vw, 1.65rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.page-kicker {
+  margin: 0 0 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--primary);
 }
 
 .toolbar {
   display: flex;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .toolbar input,
 .form-grid input,
 .auth-card input {
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
   padding: 0.7rem 0.85rem;
   background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.toolbar input:focus,
+.form-grid input:focus,
+.auth-card input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-soft);
 }
 
 .stat-grid {
@@ -102,19 +168,37 @@ input {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 1rem;
+  padding: 1.1rem 1.15rem;
   display: grid;
-  gap: 0.4rem;
+  gap: 0.45rem;
   box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), #1aa37a);
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
 .stat-card span {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .stat-card strong {
-  font-size: 1.6rem;
+  font-size: 1.65rem;
+  letter-spacing: -0.03em;
+  font-weight: 700;
 }
 
 .table-wrap {
@@ -122,6 +206,7 @@ input {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 table {
@@ -140,7 +225,10 @@ td {
 th {
   color: var(--muted);
   font-weight: 600;
-  background: #fafbfc;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #f4f8f6;
 }
 
 .form-grid {
@@ -150,7 +238,8 @@ th {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 1.25rem;
+  padding: 1.35rem;
+  box-shadow: var(--shadow);
 }
 
 .form-grid label {
@@ -185,23 +274,10 @@ th {
   border: 1px solid #abefc6;
 }
 
-.page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-}
-
-.toolbar {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
 .toolbar input,
 .product-actions input {
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
   padding: 0.65rem 0.85rem;
   background: #fff;
 }
@@ -220,13 +296,14 @@ th {
   display: grid;
   gap: 0.65rem;
   box-shadow: var(--shadow);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
 }
 
 .product-card-media {
   aspect-ratio: 1;
   border-radius: 12px;
   overflow: hidden;
-  background: #f3f5f1;
+  background: linear-gradient(145deg, #eef3f1, #e4ece8);
 }
 
 .product-card-media img {
@@ -449,12 +526,17 @@ th {
 .badge.danger { background: #fef3f2; color: var(--danger); }
 
 .stat-card-link {
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .stat-card-link:hover {
-  border-color: #b8c0cc;
-  box-shadow: 0 12px 28px rgba(16, 24, 40, 0.08);
+  border-color: #b8c8bf;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.stat-card-link:hover::before {
+  opacity: 1;
 }
 
 .inventory-product-cell {
@@ -771,13 +853,13 @@ th {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 1rem;
+  padding: 1.15rem;
   display: grid;
   gap: 0.75rem;
   box-shadow: var(--shadow);
 }
 
-.panel h3 { margin: 0; }
+.panel h3 { margin: 0; letter-spacing: -0.02em; }
 
 .timeline {
   list-style: none;

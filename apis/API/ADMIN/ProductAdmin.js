@@ -16,7 +16,7 @@ class PRODUCT_ADMIN {
                 images, videos, description, ingredients, benefits,
                 nutrition_facts, directions, storage, manufacturing_details,
                 batch_number, expiry_date, weight, gst, mrp,
-                distributor_price, franchise_price, stock, status, is_hidden
+                distributor_price, franchise_price, bv, stock, status, is_hidden
             } = req.body;
 
             if (!product_name || !sku || !categoryId || !brandId || !packageId) {
@@ -51,6 +51,7 @@ class PRODUCT_ADMIN {
                 mrp: Number(mrp) || 0,
                 distributor_price: Number(distributor_price) || 0,
                 franchise_price: Number(franchise_price) || 0,
+                bv: Math.max(0, Number(bv) || 0),
                 stock: initialStock,
                 is_hidden: Boolean(is_hidden),
                 status: status === 'disabled' ? 'disabled' : 'enabled',
@@ -106,12 +107,12 @@ class PRODUCT_ADMIN {
             const fields = [
                 'product_name', 'description', 'ingredients', 'nutrition_facts',
                 'directions', 'storage', 'manufacturing_details', 'batch_number',
-                'weight', 'gst', 'mrp', 'distributor_price', 'franchise_price', 'status'
+                'weight', 'gst', 'mrp', 'distributor_price', 'franchise_price', 'bv', 'status'
             ];
             for (const key of fields) {
                 if (req.body[key] !== undefined) {
-                    if (['gst', 'mrp', 'distributor_price', 'franchise_price'].includes(key)) {
-                        product[key] = Number(req.body[key]) || 0;
+                    if (['gst', 'mrp', 'distributor_price', 'franchise_price', 'bv'].includes(key)) {
+                        product[key] = Math.max(0, Number(req.body[key]) || 0);
                     } else if (key === 'status') {
                         product.status = req.body.status === 'disabled' ? 'disabled' : 'enabled';
                     } else {
