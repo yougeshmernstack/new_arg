@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import BrandLogo from '../../components/common/BrandLogo';
+import { getApiErrorMessage } from '../../utils/apiError';
 import '../../styles/auth.css';
 
 const initial = {
@@ -49,7 +50,7 @@ export default function Register() {
       }
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+      setError(getApiErrorMessage(err, 'Registration failed'));
     }
   };
 

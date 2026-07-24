@@ -42,6 +42,23 @@ export default function RootLayout({
         />
         {/* Plain script — Next inline scripts get truncated; this must stay external */}
         <script src="/mobile-nav.js" defer />
+        {/* Override Bootstrap link blues after CDN so theme colors win */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              :root {
+                --bs-link-color: #1b5c3a;
+                --bs-link-hover-color: #0d3a24;
+                --bs-link-color-rgb: 27, 92, 58;
+                --bs-link-hover-color-rgb: 13, 58, 36;
+              }
+              a, a:hover, a:focus, a:visited {
+                color: inherit;
+                text-decoration: none;
+              }
+            `,
+          }}
+        />
       </head>
       <body>
         <Header />

@@ -4,7 +4,7 @@ import { rankRewardApi } from '../../api';
 const CONFIG = {
   reward: {
     title: 'Reward',
-    subtitle: 'Achieve ranks based on your lifetime matched business',
+    subtitle: 'Ranks unlocked by lifetime matched business',
     fetch: () => rankRewardApi.getRewardProgress(),
     showAmount: true,
     showIncome: false,
@@ -30,9 +30,9 @@ function formatNum(n) {
 }
 
 function statusBadge(rank) {
-  if (!rank.achieved) return <span className="badge">Pending</span>;
-  if (rank.status === 1) return <span className="badge ok">Completed</span>;
-  return <span className="badge warn">Achieved</span>;
+  if (!rank.achieved) return <span className="badge rank-badge">Pending</span>;
+  if (rank.status === 1) return <span className="badge ok rank-badge">Done</span>;
+  return <span className="badge warn rank-badge">Achieved</span>;
 }
 
 export default function RankProgress({ type }) {
@@ -64,10 +64,15 @@ export default function RankProgress({ type }) {
   const ranks = data?.ranks || [];
   const matchedBv = data?.matched_bv ?? 0;
   const next = data?.next_rank;
+  const achieved = data?.achieved_count ?? 0;
+  const total = data?.total_ranks ?? 0;
+  const nextProgress = next
+    ? Math.max(0, Math.min(100, Number(next.progress) || (matchedBv / (next.matched_business || 1)) * 100))
+    : 100;
 
   return (
-    <div className="page">
-      <div className="page-head">
+    <div className="page rank-page">
+      <div className="page-head rank-page-head">
         <div>
           <h2>{view.title}</h2>
           <p className="page-sub">{view.subtitle}</p>
@@ -80,26 +85,42 @@ export default function RankProgress({ type }) {
         <p>Loading...</p>
       ) : (
         <>
-          <div className="rank-summary">
-            <div className="rank-summary-card">
-              <span className="muted">Your Match Business</span>
-              <strong>{formatNum(matchedBv)}</strong>
+          <section className="rank-hero" aria-label="Rank summary">
+            <div className="rank-hero-top">
+              <div className="rank-hero-match">
+                <span>Match Business</span>
+                <strong>{formatNum(matchedBv)}</strong>
+              </div>
+              <div className="rank-hero-side">
+                <div className="rank-hero-stat">
+                  <span>Achieved</span>
+                  <strong>
+                    {achieved}/{total}
+                  </strong>
+                </div>
+                <div className="rank-hero-stat">
+                  <span>Next</span>
+                  <strong>{next ? next.rank_name : 'Complete'}</strong>
+                </div>
+              </div>
             </div>
-            <div className="rank-summary-card">
-              <span className="muted">Achieved</span>
-              <strong>
-                {data?.achieved_count ?? 0} / {data?.total_ranks ?? 0}
-              </strong>
-            </div>
+
             {next ? (
-              <div className="rank-summary-card">
-                <span className="muted">Next: {next.rank_name}</span>
-                <strong>{formatNum(next.remaining)} BV left</strong>
+              <div className="rank-next">
+                <div className="rank-next-row">
+                  <span>
+                    {Math.round(nextProgress)}% to {next.rank_name}
+                  </span>
+                  <strong>{formatNum(next.remaining)} BV left</strong>
+                </div>
+                <div className="rank-bar rank-bar-lg">
+                  <div className="rank-bar-fill" style={{ width: `${Math.round(nextProgress)}%` }} />
+                </div>
               </div>
             ) : null}
-          </div>
+          </section>
 
-          <div className="table-wrap">
+          <div className="table-wrap rank-table-wrap">
             <table>
               <thead>
                 <tr>
@@ -129,11 +150,11 @@ export default function RankProgress({ type }) {
                       {view.showAmount ? <td>₹{formatNum(rank.reward_amount)}</td> : null}
                       {view.showIncome ? <td>{rank.income}%</td> : null}
                       <td>{rank.reward_item || '—'}</td>
-                      <td style={{ minWidth: 140 }}>
+                      <td>
                         <div className="rank-bar">
                           <div className="rank-bar-fill" style={{ width: `${rank.progress || 0}%` }} />
                         </div>
-                        <span className="muted" style={{ fontSize: 12 }}>
+                        <span className="muted rank-progress-meta">
                           {rank.progress || 0}%
                           {!rank.achieved ? ` · ${formatNum(rank.remaining)} left` : ''}
                         </span>
@@ -144,6 +165,68 @@ export default function RankProgress({ type }) {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="rank-card-list">
+            {ranks.length === 0 ? (
+              <p className="muted">No ranks configured.</p>
+            ) : (
+              ranks.map((rank, index) => {
+                const isNext = next && next.rank_id === rank.rank_id;
+                return (
+                  <article
+                    key={rank.rank_id}
+                    className={[
+                      'rank-card',
+                      rank.achieved ? 'rank-card-achieved' : '',
+                      isNext ? 'rank-card-next' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    <div className="rank-card-top">
+                      <div className="rank-card-identity">
+                        <span className="rank-card-index">{String(index + 1).padStart(2, '0')}</span>
+                        <div>
+                          <strong>
+                            {rank.rank_name}
+                            {isNext ? <em className="rank-card-tag">Next</em> : null}
+                          </strong>
+                          <span className="muted">{rank.reward_item || '—'}</span>
+                        </div>
+                      </div>
+                      {statusBadge(rank)}
+                    </div>
+
+                    <div className="rank-card-facts">
+                      <span>
+                        <b>{formatNum(rank.matched_business)}</b> BV
+                      </span>
+                      {view.showAmount ? (
+                        <span>
+                          <b>₹{formatNum(rank.reward_amount)}</b>
+                        </span>
+                      ) : null}
+                      {view.showIncome ? (
+                        <span>
+                          <b>{rank.income}%</b> income
+                        </span>
+                      ) : null}
+                      <span className="rank-card-facts-end">
+                        {rank.achieved ? 'Unlocked' : `${formatNum(rank.remaining)} left`}
+                      </span>
+                    </div>
+
+                    <div className="rank-card-progress">
+                      <div className="rank-bar">
+                        <div className="rank-bar-fill" style={{ width: `${rank.progress || 0}%` }} />
+                      </div>
+                      <span className="rank-card-pct">{rank.progress || 0}%</span>
+                    </div>
+                  </article>
+                );
+              })
+            )}
           </div>
         </>
       )}

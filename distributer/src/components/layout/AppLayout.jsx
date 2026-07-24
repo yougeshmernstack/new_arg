@@ -137,6 +137,7 @@ export default function AppLayout() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const teamActive = location.pathname.startsWith('/team');
@@ -172,6 +173,13 @@ export default function AppLayout() {
   const closeMenu = () => setMenuOpen(false);
   const toggleMenu = () => setMenuOpen((open) => !open);
   const closeProfile = () => setProfileOpen(false);
+  const closeLogout = () => setLogoutOpen(false);
+
+  const confirmLogout = () => {
+    closeLogout();
+    logout();
+    navigate('/login');
+  };
 
   const openProfile = async () => {
     setProfileOpen(true);
@@ -389,10 +397,9 @@ export default function AppLayout() {
               className="icon-button"
               aria-label="Logout"
               title="Logout"
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
+              aria-haspopup="dialog"
+              aria-expanded={logoutOpen}
+              onClick={() => setLogoutOpen(true)}
             >
               <Icon name="logout" />
             </button>
@@ -403,6 +410,33 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {logoutOpen ? (
+        <div className="confirm-backdrop" role="presentation" onClick={closeLogout}>
+          <div
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-confirm-title"
+            aria-describedby="logout-confirm-desc"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="confirm-dialog-icon" aria-hidden="true">
+              <Icon name="logout" />
+            </div>
+            <h3 id="logout-confirm-title">Logout?</h3>
+            <p id="logout-confirm-desc">You will need to sign in again to access your distributor account.</p>
+            <div className="confirm-dialog-actions">
+              <button type="button" className="btn ghost" onClick={closeLogout}>
+                Cancel
+              </button>
+              <button type="button" className="btn danger" onClick={confirmLogout}>
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {profileOpen ? (
         <div className="profile-popover-backdrop" role="presentation" onClick={closeProfile}>

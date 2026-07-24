@@ -4,6 +4,7 @@ import { storage } from '../utils/storage';
 
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },

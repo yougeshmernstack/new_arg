@@ -151,6 +151,18 @@ input {
   color: var(--blue-600);
 }
 
+.btn.danger {
+  background: #b42318;
+  border-color: #b42318;
+  color: #fff;
+  font-weight: 700;
+}
+
+.btn.danger:hover {
+  background: #912018;
+  border-color: #912018;
+}
+
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -1809,43 +1821,306 @@ tbody tr:hover {
   color: #b42318;
 }
 
-.rank-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
+.rank-page {
+  gap: 0.85rem;
 }
 
-.rank-summary-card {
+.rank-hero {
   display: grid;
-  gap: 0.25rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid #e5eaf0;
+  gap: 0.7rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse 70% 100% at 100% 0%, rgba(201, 162, 39, 0.16), transparent 55%),
+    linear-gradient(145deg, #0f2e1a 0%, #1a4325 58%, #2d6a3e 100%);
+  color: #f4faf6;
+  box-shadow: 0 10px 24px rgba(15, 46, 26, 0.14);
+}
+
+.rank-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.rank-hero-match {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.rank-hero-match span {
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(244, 250, 246, 0.7);
+}
+
+.rank-hero-match strong {
+  font-size: clamp(1.55rem, 5vw, 2rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #fff;
+}
+
+.rank-hero-side {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
   border-radius: 12px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
 }
 
-.rank-summary-card strong {
-  font-size: 1.15rem;
+.rank-hero-stat {
+  display: grid;
+  gap: 0.05rem;
+  min-width: 4.6rem;
+  padding: 0.4rem 0.65rem;
+}
+
+.rank-hero-stat + .rank-hero-stat {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.rank-hero-stat span {
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(244, 250, 246, 0.65);
+}
+
+.rank-hero-stat strong {
+  font-size: 0.86rem;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-next {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rank-next-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.65rem;
+  font-size: 0.78rem;
+  color: rgba(244, 250, 246, 0.8);
+}
+
+.rank-next-row strong {
+  font-size: 0.78rem;
+  color: #e8c96a;
+  white-space: nowrap;
 }
 
 .rank-bar {
-  height: 6px;
+  height: 5px;
   border-radius: 999px;
-  background: #eef2f6;
+  background: #e8eee9;
   overflow: hidden;
-  margin-bottom: 0.25rem;
+}
+
+.rank-bar-lg {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .rank-bar-fill {
   height: 100%;
   border-radius: 999px;
-  background: #0f766e;
+  background: linear-gradient(90deg, #3f9d64, #c9a227);
   transition: width 0.3s ease;
+}
+
+.rank-hero .rank-bar-fill {
+  background: linear-gradient(90deg, #7fe9d9 0%, #e8c96a 100%);
+}
+
+.rank-progress-meta {
+  font-size: 0.75rem;
 }
 
 .rank-row-achieved {
   background: #f0fdf9;
+}
+
+.rank-badge {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.68rem;
+}
+
+.rank-card-list {
+  display: none;
+  gap: 0.55rem;
+}
+
+.rank-card {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.03);
+}
+
+.rank-card-achieved {
+  background: #f6fbf8;
+  border-color: #d5ebe0;
+}
+
+.rank-card-next {
+  border-color: rgba(26, 67, 37, 0.28);
+  box-shadow: 0 0 0 1px rgba(26, 67, 37, 0.08), 0 8px 18px rgba(15, 46, 26, 0.06);
+}
+
+.rank-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.rank-card-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.rank-card-index {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 8px;
+  background: var(--surface-mint);
+  color: var(--primary);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.rank-card-achieved .rank-card-index {
+  background: #d9f5e8;
+  color: #067647;
+}
+
+.rank-card-next .rank-card-index {
+  background: var(--primary);
+  color: #fff;
+}
+
+.rank-card-identity > div {
+  display: grid;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.rank-card-identity strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+  color: var(--primary-dark);
+}
+
+.rank-card-tag {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--primary);
+  background: var(--surface-mint);
+  border-radius: 999px;
+  padding: 0.12rem 0.4rem;
+}
+
+.rank-card-identity .muted {
+  font-size: 0.76rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.65rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.rank-card-facts b {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.rank-card-facts-end {
+  margin-left: auto;
+}
+
+.rank-card-progress {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.rank-card-pct {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--primary);
+  min-width: 2.4rem;
+  text-align: right;
+}
+
+.rank-card .rank-bar-fill {
+  background: linear-gradient(90deg, #1a4325, #3f9d64);
+}
+
+@media (max-width: 860px) {
+  .rank-page {
+    gap: 0.65rem;
+  }
+
+  .rank-page-head {
+    display: none;
+  }
+
+  .rank-hero-top {
+    align-items: flex-start;
+  }
+
+  .rank-hero-side {
+    flex-shrink: 0;
+  }
+
+  .rank-table-wrap {
+    display: none;
+  }
+
+  .rank-card-list {
+    display: grid;
+  }
+}
+
+@media (min-width: 861px) {
+  .rank-hero {
+    padding: 1rem 1.15rem;
+  }
 }
 
 .cart-footer {

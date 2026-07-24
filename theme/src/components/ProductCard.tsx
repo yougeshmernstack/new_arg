@@ -22,7 +22,7 @@ export function ProductCard({ product }: ProductCardProps) {
           unoptimized={product.image.startsWith("http")}
         />
       </Link>
-      <div className="card-body">
+      <div className="catalog-card-body">
         <h3>
           <Link href={`/products/${product.slug}`}>{product.name}</Link>
         </h3>

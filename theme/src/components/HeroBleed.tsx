@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
+import { NatureAmbient } from '@/components/NatureAmbient';
 
 type HeroBleedProps = {
   brandName: string;
@@ -99,6 +100,8 @@ export function HeroBleed({ brandName, slogan, lede, heroSrc }: HeroBleedProps) 
           </div>
         </div>
       </div>
+
+      <NatureAmbient />
 
       <a className="hero-scroll" href="#catalog" aria-label="Scroll to products">
         <span className="hero-scroll-dot" />

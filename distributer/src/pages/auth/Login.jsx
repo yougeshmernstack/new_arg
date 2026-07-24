@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import BrandLogo from '../../components/common/BrandLogo';
+import { getApiErrorMessage } from '../../utils/apiError';
 import '../../styles/auth.css';
 
 export default function Login() {
@@ -21,7 +22,7 @@ export default function Login() {
       await login(form.username.trim(), form.password);
       navigate(location.state?.from?.pathname || '/', { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(getApiErrorMessage(err, 'Login failed'));
     }
   };
 

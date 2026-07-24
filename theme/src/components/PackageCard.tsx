@@ -24,7 +24,7 @@ export function PackageCard({ pack, featured = false }: PackageCardProps) {
         />
         <span className="package-art-shade" aria-hidden="true" />
       </Link>
-      <div className="card-body">
+      <div className="catalog-card-body">
         <div className="package-meta">
           {includeCount > 0 ? (
             <span>
