@@ -16,6 +16,10 @@ const packageSchema = new mongoose.Schema({
     pv: { type: Number, default: 0 },
     items: { type: [packageItemSchema], default: [] },
     description: { type: String, default: '' },
+    // Package gallery images (multiple)
+    images: { type: [String], default: [] },
+    // Description section images (multiple)
+    description_images: { type: [String], default: [] },
     benefits: { type: [String], default: [] },
     // active | inactive | disabled — packages are never deleted
     status: { type: String, enum: ['active', 'inactive', 'disabled'], default: 'active' },

@@ -1,6 +1,7 @@
 const Distributor = require('../../MODALS/Distributor');
 const Franchise = require('../../MODALS/Franchise');
 const AdminData = require('../../MODALS/AdminData');
+const Package = require('../../MODALS/Package');
 const { errorLogger } = require('../../utils/logger');
 const { INTERNAL_SERVER_ERROR } = require('../../utils/errorMessages');
 const { getChild } = require('../../SERVICES/BinaryPlacement');
@@ -12,6 +13,9 @@ const {
     getAvailableRepurchaseVolumes,
     calculateRepurchaseMatch
 } = require('../../SERVICES/RepurchaseMatching');
+
+const TREE_NODE_SELECT =
+    'uid username name parent_Id position joining_date activated_package_id status package_bv';
 
 function sanitizeMember(doc, extras = {}) {
     const obj = doc.toObject ? doc.toObject() : { ...doc };
@@ -28,9 +32,101 @@ function toTreeNode(doc) {
         parent_Id: doc.parent_Id ?? null,
         position: doc.position ?? null,
         joining_date: doc.joining_date || null,
+        activated_package_id: doc.activated_package_id ?? null,
+        status: doc.status || null,
+        package_name: null,
+        left_team: 0,
+        right_team: 0,
+        left_business: 0,
+        right_business: 0,
         left: null,
         right: null
     };
+}
+
+async function getTreeChild(parentUid, position) {
+    return Distributor.findOne({
+        parent_Id: Number(parentUid),
+        position
+    }).select(TREE_NODE_SELECT);
+}
+
+/**
+ * Team count + package BV for an entire binary leg (inclusive of root child).
+ */
+async function getBinaryLegStats(rootChildUid) {
+    if (rootChildUid == null) return { team: 0, bv: 0 };
+
+    let team = 0;
+    let bv = 0;
+    const visited = new Set();
+    let frontier = [Number(rootChildUid)];
+
+    while (frontier.length) {
+        const batch = frontier.filter((id) => !visited.has(id));
+        if (!batch.length) break;
+        batch.forEach((id) => visited.add(id));
+
+        const members = await Distributor.find({ uid: { $in: batch } })
+            .select('uid package_bv');
+
+        for (const member of members) {
+            team += 1;
+            bv += Number(member.package_bv) || 0;
+        }
+
+        const children = await Distributor.find({ parent_Id: { $in: batch } })
+            .select('uid');
+        frontier = children.map((c) => Number(c.uid)).filter((id) => !visited.has(id));
+    }
+
+    return { team, bv: Math.round(bv * 100) / 100 };
+}
+
+function collectTreeNodes(node, list = []) {
+    if (!node) return list;
+    list.push(node);
+    collectTreeNodes(node.left, list);
+    collectTreeNodes(node.right, list);
+    return list;
+}
+
+async function enrichBinaryTreeDetails(tree) {
+    if (!tree) return null;
+
+    const nodes = collectTreeNodes(tree);
+    const packageIds = [
+        ...new Set(
+            nodes
+                .map((n) => Number(n.activated_package_id))
+                .filter((id) => Number.isFinite(id) && id > 0)
+        )
+    ];
+
+    const packages = packageIds.length
+        ? await Package.find({ packageId: { $in: packageIds } }).select('packageId name')
+        : [];
+    const packageMap = new Map(packages.map((p) => [Number(p.packageId), p.name]));
+
+    await Promise.all(
+        nodes.map(async (node) => {
+            const [leftStats, rightStats] = await Promise.all([
+                getBinaryLegStats(node._leftUid),
+                getBinaryLegStats(node._rightUid)
+            ]);
+
+            node.package_name = packageMap.get(Number(node.activated_package_id)) || null;
+            node.left_team = leftStats.team;
+            node.right_team = rightStats.team;
+            node.left_business = leftStats.bv;
+            node.right_business = rightStats.bv;
+            delete node._leftUid;
+            delete node._rightUid;
+            delete node.activated_package_id;
+        })
+    );
+
+    return tree;
 }
 
 /**
@@ -93,16 +189,19 @@ async function isInBinaryDownline(viewerUid, targetUid) {
 
 async function buildBinaryTree(rootUid, maxDepth = 2) {
     const root = await Distributor.findOne({ uid: Number(rootUid) })
-        .select('uid username name parent_Id position joining_date');
+        .select(TREE_NODE_SELECT);
     if (!root) return null;
 
     async function attachChildren(node, depthLeft) {
         if (!node) return node;
 
         const [leftDoc, rightDoc] = await Promise.all([
-            getChild(node.uid, 'left'),
-            getChild(node.uid, 'right')
+            getTreeChild(node.uid, 'left'),
+            getTreeChild(node.uid, 'right')
         ]);
+
+        node._leftUid = leftDoc?.uid ?? null;
+        node._rightUid = rightDoc?.uid ?? null;
 
         if (depthLeft <= 0) {
             node.expandable = !!(leftDoc || rightDoc);
@@ -119,7 +218,8 @@ async function buildBinaryTree(rootUid, maxDepth = 2) {
     }
 
     const tree = toTreeNode(root);
-    return attachChildren(tree, maxDepth);
+    await attachChildren(tree, maxDepth);
+    return enrichBinaryTreeDetails(tree);
 }
 
 async function resolveSponsorUsername(sponsorUid, sponsorType) {

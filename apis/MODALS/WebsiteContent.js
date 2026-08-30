@@ -26,6 +26,14 @@ const contactSchema = new mongoose.Schema({
   supportNote: { type: String, default: '' }
 }, { _id: false });
 
+const heroSlideSchema = new mongoose.Schema({
+  imageUrl: { type: String, required: true, default: '' },
+  linkUrl: { type: String, default: '' },
+  title: { type: String, default: '' },
+  sortOrder: { type: Number, default: 0 },
+  status: { type: String, enum: ['active', 'inactive'], default: 'active' }
+}, { _id: true });
+
 const websiteContentSchema = new mongoose.Schema({
   key: { type: String, default: 'default', unique: true },
   name: { type: String, default: 'Arogya Greenlife' },
@@ -63,6 +71,7 @@ const websiteContentSchema = new mongoose.Schema({
   },
   logo: { type: String, default: '' },
   heroImage: { type: String, default: '' },
+  heroSlides: { type: [heroSlideSchema], default: [] },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });

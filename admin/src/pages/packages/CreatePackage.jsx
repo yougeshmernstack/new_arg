@@ -1,221 +1,138 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { commerceApi } from '../../api';
+import PackageFormFields from './PackageFormFields';
 
-const empty = {
+const initial = {
   name: '',
   description: '',
-  benefitsText: '',
-  amount: 0,
-  discounted_amount: 0,
-  bv: 0,
-  pv: 0,
+  amount: '',
+  discounted_amount: '',
+  bv: '',
+  pv: '',
+  benefits: '',
   status: 'active',
-  items: [],
 };
-
-function parseBenefits(text) {
-  return String(text || '')
-    .split(/[\n,]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 export default function CreatePackage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState(initial);
   const [products, setProducts] = useState([]);
+  const [items, setItems] = useState([{ productId: '', quantity: 1 }]);
+  const [images, setImages] = useState([]);
+  const [descriptionImages, setDescriptionImages] = useState([]);
+  const [uploading, setUploading] = useState('');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [loadingProducts, setLoadingProducts] = useState(true);
 
   useEffect(() => {
-    let active = true;
     (async () => {
       try {
-        const res = await commerceApi.getProducts({ limit: 200 });
-        if (active) setProducts(res.data?.data || []);
-      } catch (err) {
-        if (active) setError(err.response?.data?.message || 'Failed to load products');
-      } finally {
-        if (active) setLoadingProducts(false);
+        const res = await commerceApi.getProducts({ limit: 200, status: 'enabled' });
+        setProducts(res.data?.data || []);
+      } catch {
+        setProducts([]);
       }
     })();
-    return () => {
-      active = false;
-    };
   }, []);
 
-  const onChange = (key) => (e) => {
-    setForm((f) => ({ ...f, [key]: e.target.value }));
+  const onChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const selectedIds = new Set((form.items || []).map((i) => Number(i.productId)));
-
-  const toggleProduct = (productId) => {
-    const id = Number(productId);
-    setForm((f) => {
-      const exists = (f.items || []).find((i) => Number(i.productId) === id);
-      if (exists) {
-        return { ...f, items: f.items.filter((i) => Number(i.productId) !== id) };
-      }
-      return { ...f, items: [...(f.items || []), { productId: id, quantity: 1 }] };
-    });
+  const updateItem = (index, field, value) => {
+    setItems((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   };
 
-  const setQty = (productId, quantity) => {
-    const id = Number(productId);
-    const qty = Math.max(1, Number(quantity) || 1);
-    setForm((f) => ({
-      ...f,
-      items: (f.items || []).map((i) =>
-        Number(i.productId) === id ? { ...i, quantity: qty } : i
-      ),
-    }));
+  const addItem = () => setItems((prev) => [...prev, { productId: '', quantity: 1 }]);
+
+  const removeItem = (index) => {
+    setItems((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+
+  const uploadImages = async (e, kind, setter) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    setUploading(kind);
+    setError('');
+    try {
+      const formData = new FormData();
+      files.forEach((file) => formData.append('files', file));
+      const res = await commerceApi.uploadMedia(formData);
+      const uploaded = res.data?.data?.images || [];
+      setter((prev) => [...prev, ...uploaded]);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to upload images');
+    } finally {
+      setUploading('');
+    }
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!(form.items || []).length) {
-      setError('Select at least one product.');
-      return;
-    }
-    setSaving(true);
+    setLoading(true);
     setError('');
     try {
+      const normalizedItems = items
+        .filter((row) => row.productId)
+        .map((row) => ({
+          productId: Number(row.productId),
+          quantity: Math.max(1, Number(row.quantity) || 1),
+        }));
       await commerceApi.createPackage({
-        name: form.name,
-        description: form.description,
-        benefits: parseBenefits(form.benefitsText),
-        amount: Number(form.amount),
-        discounted_amount: Number(form.discounted_amount),
-        bv: Number(form.bv),
-        pv: Number(form.pv),
-        status: form.status,
-        items: form.items.map((i) => ({
-          productId: Number(i.productId),
-          quantity: Math.max(1, Number(i.quantity) || 1),
-        })),
+        ...form,
+        amount: Number(form.amount) || 0,
+        discounted_amount: Number(form.discounted_amount) || 0,
+        bv: Number(form.bv) || 0,
+        pv: Number(form.pv) || 0,
+        images,
+        description_images: descriptionImages,
+        items: normalizedItems,
       });
       navigate('/packages');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create package');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
   return (
     <div className="page">
       <div className="page-head">
-        <h2>Create Package</h2>
+        <div>
+          <h2>Create Package</h2>
+          <p className="page-sub">Bundle products for distributor activation</p>
+        </div>
         <Link className="btn ghost" to="/packages">
           Back
         </Link>
       </div>
+
       {error ? <div className="alert error">{error}</div> : null}
-      <form className="form-grid commerce-form" onSubmit={onSubmit}>
-        <label>
-          Name
-          <input required value={form.name} onChange={onChange('name')} />
-        </label>
-        <label>
-          Status
-          <select value={form.status} onChange={onChange('status')}>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </label>
-        <label>
-          Amount (MRP)
-          <input required type="number" min="0" step="0.01" value={form.amount} onChange={onChange('amount')} />
-        </label>
-        <label>
-          Discounted amount
-          <input
-            required
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.discounted_amount}
-            onChange={onChange('discounted_amount')}
-          />
-        </label>
-        <label>
-          Package BV
-          <input type="number" min="0" step="0.01" value={form.bv} onChange={onChange('bv')} />
-        </label>
-        <label>
-          Package PV
-          <input type="number" min="0" step="0.01" value={form.pv} onChange={onChange('pv')} />
-        </label>
-        <label className="full">
-          Description
-          <textarea rows={3} value={form.description} onChange={onChange('description')} />
-        </label>
-        <label className="full">
-          Benefits (one per line or comma-separated)
-          <textarea rows={3} value={form.benefitsText} onChange={onChange('benefitsText')} />
-        </label>
 
-        <div className="full">
-          <h3>Products in package</h3>
-          {loadingProducts ? (
-            <p>Loading products...</p>
-          ) : products.length === 0 ? (
-            <p>No products found. Add products first.</p>
-          ) : (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th />
-                    <th>Product</th>
-                    <th>SKU</th>
-                    <th>Stock</th>
-                    <th>Qty in package</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((p) => {
-                    const checked = selectedIds.has(Number(p.productId));
-                    const row = (form.items || []).find((i) => Number(i.productId) === Number(p.productId));
-                    return (
-                      <tr key={p.productId}>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleProduct(p.productId)}
-                          />
-                        </td>
-                        <td>{p.product_name}</td>
-                        <td>{p.sku}</td>
-                        <td>{p.stock}</td>
-                        <td>
-                          <input
-                            type="number"
-                            min="1"
-                            disabled={!checked}
-                            value={row?.quantity ?? 1}
-                            onChange={(e) => setQty(p.productId, e.target.value)}
-                            style={{ width: 80 }}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        <div className="form-actions full">
-          <button type="submit" className="btn primary" disabled={saving || loadingProducts}>
-            {saving ? 'Saving...' : 'Create package'}
-          </button>
-        </div>
+      <form onSubmit={onSubmit}>
+        <PackageFormFields
+          form={form}
+          onChange={onChange}
+          products={products}
+          items={items}
+          updateItem={updateItem}
+          addItem={addItem}
+          removeItem={removeItem}
+          images={images}
+          descriptionImages={descriptionImages}
+          uploading={uploading}
+          onUploadImages={(e) => uploadImages(e, 'package', setImages)}
+          onUploadDescriptionImages={(e) => uploadImages(e, 'description', setDescriptionImages)}
+          onRemoveImage={(index) => setImages((prev) => prev.filter((_, i) => i !== index))}
+          onRemoveDescriptionImage={(index) =>
+            setDescriptionImages((prev) => prev.filter((_, i) => i !== index))
+          }
+          submitLabel="Create package"
+          submitting={loading}
+        />
       </form>
     </div>
   );

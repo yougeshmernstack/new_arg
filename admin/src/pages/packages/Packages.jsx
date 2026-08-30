@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { commerceApi } from '../../api';
+import { API_BASE_URL } from '../../utils/constants';
+
+function mediaUrl(path) {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+function formatMoney(value) {
+  const n = Number(value || 0);
+  return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+}
 
 export default function Packages() {
   const [list, setList] = useState([]);
@@ -50,14 +62,19 @@ export default function Packages() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>Packages</h2>
+        <div>
+          <h2>Packages</h2>
+          <p className="page-sub">
+            {loading ? 'Loading…' : `${list.length} package${list.length === 1 ? '' : 's'}`}
+          </p>
+        </div>
         <Link className="btn primary" to="/packages/create">
           Create Package
         </Link>
       </div>
 
       <form
-        className="toolbar"
+        className="toolbar packages-toolbar"
         onSubmit={(e) => {
           e.preventDefault();
           load();
@@ -77,62 +94,84 @@ export default function Packages() {
       {message ? <div className="alert success">{message}</div> : null}
 
       {loading ? (
-        <p>Loading...</p>
+        <p className="muted">Loading packages…</p>
       ) : list.length === 0 ? (
-        <p>No packages yet. Create one to activate distributors.</p>
+        <div className="panel packages-empty">
+          <h3>No packages yet</h3>
+          <p className="muted">Create a package to activate distributors.</p>
+          <Link className="btn primary" to="/packages/create">
+            Create Package
+          </Link>
+        </div>
       ) : (
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Amount</th>
-                <th>Discounted</th>
-                <th>BV</th>
-                <th>PV</th>
-                <th>Products</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((item) => (
-                <tr key={item.packageId}>
-                  <td>{item.packageId}</td>
-                  <td>
-                    <strong>{item.name}</strong>
-                    {item.description ? (
-                      <div className="muted">{String(item.description).slice(0, 80)}</div>
-                    ) : null}
-                  </td>
-                  <td>₹{Number(item.amount || 0).toFixed(2)}</td>
-                  <td>₹{Number(item.discounted_amount ?? item.price ?? 0).toFixed(2)}</td>
-                  <td>{item.bv ?? 0}</td>
-                  <td>{item.pv ?? 0}</td>
-                  <td>{(item.items || []).length}</td>
-                  <td>
-                    <span className={`badge ${item.status === 'active' ? 'ok' : ''}`}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="actions">
-                    <Link className="btn ghost" to={`/packages/${item.packageId}/edit`}>
-                      Edit
-                    </Link>
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      disabled={busyId === item.packageId || item.status === 'disabled'}
-                      onClick={() => toggleStatus(item)}
-                    >
-                      {item.status === 'active' ? 'Deactivate' : 'Activate'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="packages-grid">
+          {list.map((item) => {
+            const thumb = item.images?.[0];
+            const productCount = (item.items || []).length;
+            const busy = busyId === item.packageId;
+            const statusClass =
+              item.status === 'active' ? 'ok' : item.status === 'disabled' ? 'danger' : 'warn';
+
+            return (
+              <article key={item.packageId} className="package-card">
+                <div className="package-card-media">
+                  {thumb ? (
+                    <img src={mediaUrl(thumb)} alt={item.name} />
+                  ) : (
+                    <div className="package-card-placeholder">No image</div>
+                  )}
+                  <span className={`badge ${statusClass}`}>{item.status}</span>
+                </div>
+
+                <div className="package-card-body">
+                  <div className="package-card-title">
+                    <span className="package-card-id">#{item.packageId}</span>
+                    <h3>{item.name}</h3>
+                  </div>
+
+                  <div className="package-card-metrics">
+                    <div>
+                      <span>List</span>
+                      <strong>{formatMoney(item.amount)}</strong>
+                    </div>
+                    <div>
+                      <span>Discounted</span>
+                      <strong>{formatMoney(item.discounted_amount ?? item.price)}</strong>
+                    </div>
+                    <div>
+                      <span>BV</span>
+                      <strong>{item.bv ?? 0}</strong>
+                    </div>
+                    <div>
+                      <span>PV</span>
+                      <strong>{item.pv ?? 0}</strong>
+                    </div>
+                  </div>
+
+                  <p className="package-card-meta">
+                    {productCount} product{productCount === 1 ? '' : 's'} in package
+                    {Array.isArray(item.images) && item.images.length
+                      ? ` · ${item.images.length} image${item.images.length === 1 ? '' : 's'}`
+                      : ''}
+                  </p>
+                </div>
+
+                <div className="package-card-actions">
+                  <Link className="btn primary" to={`/packages/${item.packageId}/edit`}>
+                    Edit
+                  </Link>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    disabled={busy || item.status === 'disabled'}
+                    onClick={() => toggleStatus(item)}
+                  >
+                    {busy ? 'Updating…' : item.status === 'active' ? 'Deactivate' : 'Activate'}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

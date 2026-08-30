@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { commerceApi } from '../../api';
 import { API_BASE_URL } from '../../utils/constants';
+import { exportToExcel, formatExcelAmount } from '../../utils/exportExcel';
 
 function mediaUrl(path) {
   if (!path) return '';
@@ -86,9 +87,38 @@ export default function Products() {
     <div className="page">
       <div className="page-head">
         <h2>Products</h2>
-        <Link className="btn primary" to="/products/create">
-          Add Product
-        </Link>
+        <div className="toolbar" style={{ margin: 0, padding: 0, border: 'none', background: 'transparent' }}>
+          <button
+            type="button"
+            className="btn"
+            disabled={loading || !list.length}
+            onClick={() =>
+              exportToExcel({
+                filename: 'products',
+                sheetName: 'Products',
+                rows: list,
+                columns: [
+                  { header: 'ID', value: (r) => r.productId ?? '' },
+                  { header: 'Name', value: (r) => r.product_name || '' },
+                  { header: 'SKU', value: (r) => r.sku || '' },
+                  { header: 'Stock', value: (r) => r.stock ?? r.available_stock ?? '' },
+                  { header: 'MRP', value: (r) => formatExcelAmount(r.mrp) },
+                  {
+                    header: 'Distributor Price',
+                    value: (r) => formatExcelAmount(r.distributor_price || r.price),
+                  },
+                  { header: 'Hidden', value: (r) => (r.is_hidden ? 'Yes' : 'No') },
+                  { header: 'Status', value: (r) => r.status || '' },
+                ],
+              })
+            }
+          >
+            Export Excel
+          </button>
+          <Link className="btn primary" to="/products/create">
+            Add Product
+          </Link>
+        </div>
       </div>
 
       <form
@@ -186,7 +216,7 @@ export default function Products() {
                             setStockForm({ action: 'increase', quantity: 1, remark: '' });
                           }}
                         >
-                          Stock
+                          Add / Reduce Stock
                         </button>
                         <Link className="btn ghost" to={`/stock-history?productId=${item.productId}`}>
                           History
@@ -204,8 +234,8 @@ export default function Products() {
       {stockModal ? (
         <div className="modal-backdrop" onClick={() => setStockModal(null)} role="presentation">
           <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
-            <h3>Update stock — {stockModal.product_name}</h3>
-            <p className="muted">Current stock: {stockModal.stock}</p>
+            <h3>Add / Reduce Stock — {stockModal.product_name}</h3>
+            <p className="muted">Current stock: <strong>{stockModal.stock}</strong></p>
             <form className="form-grid" onSubmit={submitStock}>
               <label>
                 Action
@@ -213,24 +243,26 @@ export default function Products() {
                   value={stockForm.action}
                   onChange={(e) => setStockForm((s) => ({ ...s, action: e.target.value }))}
                 >
-                  <option value="increase">Increase</option>
-                  <option value="decrease">Decrease</option>
-                  <option value="set">Set absolute</option>
+                  <option value="increase">Increase (add stock)</option>
+                  <option value="decrease">Decrease (reduce stock)</option>
+                  <option value="set">Set exact stock</option>
                 </select>
               </label>
               <label>
                 Quantity
                 <input
                   type="number"
-                  min="0"
+                  min={stockForm.action === 'set' ? '0' : '1'}
+                  step="1"
                   required
                   value={stockForm.quantity}
                   onChange={(e) => setStockForm((s) => ({ ...s, quantity: e.target.value }))}
                 />
               </label>
               <label>
-                Remark
+                Remark (optional)
                 <input
+                  placeholder="e.g. Warehouse receipt / damaged goods"
                   value={stockForm.remark}
                   onChange={(e) => setStockForm((s) => ({ ...s, remark: e.target.value }))}
                 />
@@ -240,7 +272,7 @@ export default function Products() {
                   Cancel
                 </button>
                 <button type="submit" className="btn primary" disabled={busyId === stockModal.productId}>
-                  Save
+                  {busyId === stockModal.productId ? 'Saving...' : 'Update Stock'}
                 </button>
               </div>
             </form>

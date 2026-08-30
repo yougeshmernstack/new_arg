@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { paymentsApi } from '../../api';
 import { API_BASE_URL } from '../../utils/constants';
+import { exportToExcel, formatExcelAmount, formatExcelDate } from '../../utils/exportExcel';
 
 function mediaUrl(path) {
   if (!path) return '';
@@ -84,9 +85,34 @@ export default function FundDeposits() {
           <h2>Fund Deposits</h2>
           <p>Verify UTR and credit distributor fund wallets</p>
         </div>
-        <Link className="btn ghost" to="/fund-deposit-history">
-          View history
-        </Link>
+        <div className="toolbar" style={{ margin: 0, padding: 0, border: 'none', background: 'transparent' }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              exportToExcel({
+                filename: 'fund_deposits',
+                sheetName: 'Fund Deposits',
+                rows: list,
+                columns: [
+                  { header: 'Date', value: (r) => formatExcelDate(r.createdAt) },
+                  { header: 'UID', value: (r) => r.uid ?? '' },
+                  { header: 'Amount', value: (r) => formatExcelAmount(r.amount) },
+                  { header: 'UTR', value: (r) => r.utr || '' },
+                  { header: 'Status', value: (r) => statusLabel(r.status) },
+                  { header: 'Tx ID', value: (r) => r.creditTxId || '' },
+                  { header: 'Remark', value: (r) => r.remark || '' },
+                ],
+              })
+            }
+            disabled={loading || !list.length}
+          >
+            Export Excel
+          </button>
+          <Link className="btn ghost" to="/fund-deposit-history">
+            View history
+          </Link>
+        </div>
       </div>
 
       <div className="toolbar">

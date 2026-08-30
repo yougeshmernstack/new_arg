@@ -6,8 +6,9 @@ const CONFIG = {
     title: 'Reward',
     subtitle: 'Ranks unlocked by lifetime matched business',
     fetch: () => rankRewardApi.getRewardProgress(),
-    showAmount: true,
+    showAmount: false,
     showIncome: false,
+    showItem: true,
   },
   royality: {
     title: 'Royality',
@@ -15,6 +16,7 @@ const CONFIG = {
     fetch: () => rankRewardApi.getRoyalityProgress(),
     showAmount: false,
     showIncome: true,
+    showItem: false,
   },
   traveling: {
     title: 'Traveling Allowance',
@@ -22,6 +24,7 @@ const CONFIG = {
     fetch: () => rankRewardApi.getTravelingProgress(),
     showAmount: false,
     showIncome: true,
+    showItem: true,
   },
 };
 
@@ -128,7 +131,7 @@ export default function RankProgress({ type }) {
                   <th>Required Match BV</th>
                   {view.showAmount ? <th>Reward Amount</th> : null}
                   {view.showIncome ? <th>Income %</th> : null}
-                  <th>Item / Benefit</th>
+                  {view.showItem ? <th>Item / Benefit</th> : null}
                   <th>Progress</th>
                   <th>Status</th>
                 </tr>
@@ -136,7 +139,15 @@ export default function RankProgress({ type }) {
               <tbody>
                 {ranks.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="muted">
+                    <td
+                      colSpan={
+                        4 +
+                        (view.showAmount ? 1 : 0) +
+                        (view.showIncome ? 1 : 0) +
+                        (view.showItem ? 1 : 0)
+                      }
+                      className="muted"
+                    >
                       No ranks configured.
                     </td>
                   </tr>
@@ -149,7 +160,7 @@ export default function RankProgress({ type }) {
                       <td>{formatNum(rank.matched_business)}</td>
                       {view.showAmount ? <td>₹{formatNum(rank.reward_amount)}</td> : null}
                       {view.showIncome ? <td>{rank.income}%</td> : null}
-                      <td>{rank.reward_item || '—'}</td>
+                      {view.showItem ? <td>{rank.reward_item || '—'}</td> : null}
                       <td>
                         <div className="rank-bar">
                           <div className="rank-bar-fill" style={{ width: `${rank.progress || 0}%` }} />
@@ -192,7 +203,9 @@ export default function RankProgress({ type }) {
                             {rank.rank_name}
                             {isNext ? <em className="rank-card-tag">Next</em> : null}
                           </strong>
-                          <span className="muted">{rank.reward_item || '—'}</span>
+                          {view.showItem ? (
+                            <span className="muted">{rank.reward_item || '—'}</span>
+                          ) : null}
                         </div>
                       </div>
                       {statusBadge(rank)}

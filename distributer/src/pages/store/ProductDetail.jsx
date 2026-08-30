@@ -51,6 +51,11 @@ export default function ProductDetail() {
     return [...images, ...videos];
   }, [product]);
 
+  const descImages = useMemo(
+    () => (product?.description_images || []).filter(Boolean),
+    [product]
+  );
+
   const activeItem = galleryItems[activeIndex] || null;
 
   const addToCart = async () => {
@@ -255,6 +260,22 @@ export default function ProductDetail() {
           ) : null}
         </div>
       </div>
+
+      {descImages.length > 0 ? (
+        <section className="product-desc-images distributor-desc-images">
+          <h2>Description images</h2>
+          <div className="product-desc-images-stack">
+            {descImages.map((src, index) => (
+              <img
+                key={`${src}-${index}`}
+                className="product-desc-image"
+                src={mediaUrl(src)}
+                alt={`${product.product_name} description ${index + 1}`}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

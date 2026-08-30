@@ -1,16 +1,43 @@
 import type { Metadata } from "next";
+import fs from "fs";
+import path from "path";
 import Link from "next/link";
 import { brand as fallbackBrand, legalDocuments as fallbackLegal } from "@/data/brand";
 import { mediaUrl, themeApi, type LegalDoc } from "@/lib/themeApi";
-import { getSiteBrand } from "@/lib/siteContent";
+import LegalPdfAttach from "@/components/LegalPdfAttach";
 
 export const metadata: Metadata = {
   title: `Legal Documents | ${fallbackBrand.name}`,
   description: `Privacy policy, terms, shipping, refund policy, and disclaimer for ${fallbackBrand.name}.`,
 };
 
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function localPdfSize(fileUrl?: string) {
+  if (!fileUrl) return undefined;
+  const name = fileUrl.split("?")[0].split("/").pop();
+  if (!name) return undefined;
+  const localPath = path.join("/var/www/arogyagreenlife/apis/uploads/legal", name);
+  try {
+    return formatBytes(fs.statSync(localPath).size);
+  } catch {
+    return undefined;
+  }
+}
+
 async function getLegalDocs(): Promise<
-  { id: string; title: string; summary: string; fileUrl?: string; sections?: { heading: string; body: string }[] }[]
+  {
+    id: string;
+    title: string;
+    summary: string;
+    fileUrl?: string;
+    fileSize?: string;
+    sections?: { heading: string; body: string }[];
+  }[]
 > {
   try {
     const res = await themeApi.getLegalDocuments();
@@ -21,6 +48,7 @@ async function getLegalDocs(): Promise<
         title: doc.title,
         summary: doc.summary || "",
         fileUrl: doc.fileUrl ? mediaUrl(doc.fileUrl) : undefined,
+        fileSize: localPdfSize(doc.fileUrl),
       }));
     }
   } catch {
@@ -35,7 +63,7 @@ async function getLegalDocs(): Promise<
 }
 
 export default async function LegalPage() {
-  const [brand, docs] = await Promise.all([getSiteBrand(), getLegalDocs()]);
+  const docs = await getLegalDocs();
 
   return (
     <>
@@ -48,33 +76,14 @@ export default async function LegalPage() {
         </p>
       </section>
 
-      <section className="section legal-index">
-        <div className="legal-nav">
-          <h2>Quick links</h2>
-          <nav aria-label="Legal document links">
-            {docs.map((doc) => (
-              <a href={`#${doc.id}`} key={doc.id}>
-                {doc.title}
-              </a>
-            ))}
-          </nav>
-          <p className="muted">
-            For legal or compliance questions, contact{" "}
-            <a href={`mailto:${brand.contact.email}`}>{brand.contact.email}</a>.
-          </p>
-        </div>
-
-        <div className="legal-content">
+      <section className="section legal-index legal-index-grid">
+        <div className="legal-content legal-doc-grid">
           {docs.map((doc) => (
             <article className="legal-doc" id={doc.id} key={doc.id}>
               <h2>{doc.title}</h2>
               {doc.summary ? <p className="legal-summary">{doc.summary}</p> : null}
               {doc.fileUrl ? (
-                <p>
-                  <a className="button button-soft" href={doc.fileUrl} target="_blank" rel="noreferrer">
-                    View / download PDF
-                  </a>
-                </p>
+                <LegalPdfAttach title={doc.title} fileUrl={doc.fileUrl} fileSize={doc.fileSize} />
               ) : null}
               {doc.sections?.map((section) => (
                 <div className="legal-section" key={section.heading}>
@@ -87,7 +96,7 @@ export default async function LegalPage() {
         </div>
       </section>
 
-      <section className="section section-white centered-section">
+      {/* <section className="section section-white centered-section">
         <p className="muted">Need help before placing an order?</p>
         <div className="hero-actions centered-actions">
           <Link className="button button-soft" href="/contact">
@@ -97,7 +106,7 @@ export default async function LegalPage() {
             About company
           </Link>
         </div>
-      </section>
+      </section> */}
     </>
   );
 }

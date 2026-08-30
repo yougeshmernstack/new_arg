@@ -1,88 +1,57 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { commerceApi } from '../../api';
-import { API_BASE_URL } from '../../utils/constants';
-
-function mediaUrl(path) {
-  if (!path) return '';
-  if (/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
-}
-
-function parseBenefits(text) {
-  return String(text || '')
-    .split(/[\n,]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 export default function EditProduct() {
   const { productId } = useParams();
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
-  const [error, setError] = useState('');
+  const [currentStock, setCurrentStock] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [stockSaving, setStockSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [stockMessage, setStockMessage] = useState('');
+  const [stockForm, setStockForm] = useState({ action: 'increase', quantity: 1, remark: '' });
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const res = await commerceApi.getProduct(productId);
-        const data = res.data?.data || null;
-        if (active && data) {
-          setForm({
-            ...data,
-            images: data.images || [],
-            videos: data.videos || [],
-            benefitsText: Array.isArray(data.benefits) ? data.benefits.join('\n') : '',
-          });
-        } else if (active) {
-          setForm(null);
-        }
-      } catch (err) {
-        if (active) setError(err.response?.data?.message || 'Failed to load product');
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [productId]);
-
-  const onChange = (key) => (e) => {
-    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setForm((f) => ({ ...f, [key]: value }));
-  };
-
-  const uploadFiles = async (fileList, kind) => {
-    const files = Array.from(fileList || []);
-    if (!files.length) return;
-    setUploading(true);
+  const loadProduct = async () => {
+    setLoading(true);
     setError('');
     try {
-      const fd = new FormData();
-      files.forEach((file) => fd.append('files', file));
-      const res = await commerceApi.uploadMedia(fd);
-      const data = res.data?.data || {};
-      if (kind === 'image') {
-        const next = data.images?.length ? data.images : (data.urls || []).filter((u) => !/\.(mp4|webm)$/i.test(u));
-        setForm((f) => ({ ...f, images: [...(f.images || []), ...next] }));
-      } else {
-        const next = data.videos?.length ? data.videos : (data.urls || []).filter((u) => /\.(mp4|webm)$/i.test(u));
-        setForm((f) => ({ ...f, videos: [...(f.videos || []), ...next] }));
-      }
+      const res = await commerceApi.getProduct(productId);
+      const p = res.data?.data;
+      setForm({
+        product_name: p.product_name || '',
+        sku: p.sku || '',
+        categoryId: p.categoryId ?? '',
+        brandId: p.brandId ?? '',
+        packageId: p.packageId ?? '',
+        description: p.description || '',
+        mrp: p.mrp ?? '',
+        distributor_price: p.distributor_price ?? '',
+        franchise_price: p.franchise_price ?? '',
+        bv: p.bv ?? '',
+        gst: p.gst ?? '',
+        weight: p.weight || '',
+        status: p.status || 'enabled',
+        is_hidden: Boolean(p.is_hidden),
+      });
+      setCurrentStock(Number(p.stock) || 0);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to upload media');
+      setError(err.response?.data?.message || 'Failed to load product');
     } finally {
-      setUploading(false);
+      setLoading(false);
     }
   };
 
-  const removeMedia = (key, index) => {
-    setForm((f) => ({
-      ...f,
-      [key]: (f[key] || []).filter((_, i) => i !== index),
-    }));
+  useEffect(() => {
+    loadProduct();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
+
+  const onChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const onSubmit = async (e) => {
@@ -92,27 +61,15 @@ export default function EditProduct() {
     try {
       await commerceApi.updateProduct({
         productId: Number(productId),
-        product_name: form.product_name,
-        description: form.description,
-        ingredients: form.ingredients,
-        benefits: parseBenefits(form.benefitsText),
-        nutrition_facts: form.nutrition_facts,
-        directions: form.directions,
-        storage: form.storage,
-        manufacturing_details: form.manufacturing_details,
+        ...form,
         categoryId: Number(form.categoryId),
         brandId: Number(form.brandId),
         packageId: Number(form.packageId),
-        mrp: Number(form.mrp),
-        distributor_price: Number(form.distributor_price),
-        franchise_price: Number(form.franchise_price),
-        bv: Number(form.bv),
-        gst: Number(form.gst),
-        weight: form.weight,
-        status: form.status,
-        is_hidden: form.is_hidden,
-        images: form.images || [],
-        videos: form.videos || [],
+        mrp: Number(form.mrp) || 0,
+        distributor_price: Number(form.distributor_price) || 0,
+        franchise_price: Number(form.franchise_price) || 0,
+        bv: Number(form.bv) || 0,
+        gst: Number(form.gst) || 0,
       });
       navigate('/products');
     } catch (err) {
@@ -122,159 +79,159 @@ export default function EditProduct() {
     }
   };
 
-  if (!form && !error) return <div className="page">Loading...</div>;
+  const onStockSubmit = async (e) => {
+    e.preventDefault();
+    setStockSaving(true);
+    setError('');
+    setStockMessage('');
+    try {
+      const res = await commerceApi.updateStock({
+        productId: Number(productId),
+        action: stockForm.action,
+        quantity: Number(stockForm.quantity),
+        remark: stockForm.remark,
+      });
+      const next = res.data?.data?.product?.stock;
+      setCurrentStock(Number.isFinite(next) ? next : currentStock);
+      setStockMessage('Stock updated successfully.');
+      setStockForm({ action: 'increase', quantity: 1, remark: '' });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update stock');
+    } finally {
+      setStockSaving(false);
+    }
+  };
+
+  if (loading) return <div className="page">Loading product...</div>;
+  if (!form) return <div className="page alert error">{error || 'Product not found'}</div>;
 
   return (
     <div className="page">
       <div className="page-head">
-        <h2>Edit Product #{productId}</h2>
+        <div>
+          <h2>Edit Product #{productId}</h2>
+          <p className="page-sub">SKU: {form.sku} · Current stock: {currentStock}</p>
+        </div>
         <Link className="btn ghost" to="/products">
           Back
         </Link>
       </div>
+
       {error ? <div className="alert error">{error}</div> : null}
-      {form ? (
-        <form className="form-grid commerce-form" onSubmit={onSubmit}>
+      {stockMessage ? <div className="alert success">{stockMessage}</div> : null}
+
+      <section className="panel" style={{ maxWidth: 760, marginBottom: 24 }}>
+        <h3 style={{ marginTop: 0 }}>Add / Reduce Stock</h3>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Current available stock: <strong>{currentStock}</strong>
+        </p>
+        <form className="form-grid" onSubmit={onStockSubmit}>
           <label>
-            Name
-            <input required value={form.product_name || ''} onChange={onChange('product_name')} />
-          </label>
-          <label>
-            SKU
-            <input disabled value={form.sku || ''} />
-          </label>
-          <label>
-            Category ID
-            <input type="number" value={form.categoryId ?? 1} onChange={onChange('categoryId')} />
-          </label>
-          <label>
-            Brand ID
-            <input type="number" value={form.brandId ?? 1} onChange={onChange('brandId')} />
-          </label>
-          <label>
-            Package ID
-            <input type="number" value={form.packageId ?? 1} onChange={onChange('packageId')} />
-          </label>
-          <label>
-            Weight
-            <input value={form.weight || ''} onChange={onChange('weight')} />
-          </label>
-          <label>
-            MRP
-            <input type="number" value={form.mrp ?? 0} onChange={onChange('mrp')} />
-          </label>
-          <label>
-            Distributor price
-            <input type="number" value={form.distributor_price ?? 0} onChange={onChange('distributor_price')} />
-          </label>
-          <label>
-            Franchise price
-            <input type="number" value={form.franchise_price ?? 0} onChange={onChange('franchise_price')} />
-          </label>
-          <label>
-            BV (repurchase)
-            <input type="number" min="0" value={form.bv ?? 0} onChange={onChange('bv')} />
-          </label>
-          <label>
-            GST %
-            <input type="number" value={form.gst ?? 0} onChange={onChange('gst')} />
-          </label>
-          <label>
-            Status
-            <select value={form.status || 'enabled'} onChange={onChange('status')}>
-              <option value="enabled">Enabled</option>
-              <option value="disabled">Disabled</option>
+            Action
+            <select
+              value={stockForm.action}
+              onChange={(e) => setStockForm((s) => ({ ...s, action: e.target.value }))}
+            >
+              <option value="increase">Increase (add stock)</option>
+              <option value="decrease">Decrease (reduce stock)</option>
+              <option value="set">Set exact stock</option>
             </select>
           </label>
-          <label className="check">
-            <input type="checkbox" checked={Boolean(form.is_hidden)} onChange={onChange('is_hidden')} />
-            Hidden from buyers
-          </label>
-
-          <label className="full">
-            Description
-            <textarea rows={4} value={form.description || ''} onChange={onChange('description')} />
-          </label>
-          <label className="full">
-            Benefits (one per line or comma-separated)
-            <textarea rows={3} value={form.benefitsText || ''} onChange={onChange('benefitsText')} />
-          </label>
-          <label className="full">
-            Ingredients
-            <textarea rows={3} value={form.ingredients || ''} onChange={onChange('ingredients')} />
-          </label>
-          <label className="full">
-            Directions / How to use
-            <textarea rows={3} value={form.directions || ''} onChange={onChange('directions')} />
-          </label>
-          <label className="full">
-            Storage
-            <textarea rows={2} value={form.storage || ''} onChange={onChange('storage')} />
-          </label>
-          <label className="full">
-            Nutrition facts
-            <textarea rows={3} value={form.nutrition_facts || ''} onChange={onChange('nutrition_facts')} />
-          </label>
-          <label className="full">
-            Manufacturing details
-            <textarea rows={2} value={form.manufacturing_details || ''} onChange={onChange('manufacturing_details')} />
-          </label>
-
-          <div className="full media-upload-block">
-            <h3>Product images</h3>
+          <label>
+            Quantity
             <input
-              type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp"
-              multiple
-              disabled={uploading}
-              onChange={(e) => {
-                uploadFiles(e.target.files, 'image');
-                e.target.value = '';
-              }}
+              type="number"
+              min={stockForm.action === 'set' ? '0' : '1'}
+              step="1"
+              required
+              value={stockForm.quantity}
+              onChange={(e) => setStockForm((s) => ({ ...s, quantity: e.target.value }))}
             />
-            <div className="media-preview-grid">
-              {(form.images || []).map((url, i) => (
-                <div className="media-preview-item" key={`${url}-${i}`}>
-                  <img src={mediaUrl(url)} alt={`Product ${i + 1}`} />
-                  <button type="button" className="btn ghost" onClick={() => removeMedia('images', i)}>
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="full media-upload-block">
-            <h3>Product videos</h3>
+          </label>
+          <label className="full">
+            Remark (optional)
             <input
-              type="file"
-              accept="video/mp4,video/webm"
-              multiple
-              disabled={uploading}
-              onChange={(e) => {
-                uploadFiles(e.target.files, 'video');
-                e.target.value = '';
-              }}
+              placeholder="e.g. Warehouse receipt / damaged goods"
+              value={stockForm.remark}
+              onChange={(e) => setStockForm((s) => ({ ...s, remark: e.target.value }))}
             />
-            <div className="media-preview-grid">
-              {(form.videos || []).map((url, i) => (
-                <div className="media-preview-item" key={`${url}-${i}`}>
-                  <video src={mediaUrl(url)} controls muted />
-                  <button type="button" className="btn ghost" onClick={() => removeMedia('videos', i)}>
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
+          </label>
           <div className="form-actions full">
-            <button type="submit" className="btn primary" disabled={saving || uploading}>
-              {uploading ? 'Uploading...' : saving ? 'Saving...' : 'Save changes'}
+            <button type="submit" className="btn primary" disabled={stockSaving}>
+              {stockSaving ? 'Updating...' : 'Update Stock'}
             </button>
+            <Link className="btn ghost" to={`/stock-history?productId=${productId}`}>
+              View History
+            </Link>
           </div>
         </form>
-      ) : null}
+      </section>
+
+      <form className="form-grid" onSubmit={onSubmit} style={{ maxWidth: 760 }}>
+        <h3 className="full" style={{ margin: 0 }}>
+          Product details
+        </h3>
+        <label>
+          Product name
+          <input name="product_name" value={form.product_name} onChange={onChange} required />
+        </label>
+        <label>
+          Category ID
+          <input name="categoryId" type="number" min="1" value={form.categoryId} onChange={onChange} required />
+        </label>
+        <label>
+          Brand ID
+          <input name="brandId" type="number" min="1" value={form.brandId} onChange={onChange} required />
+        </label>
+        <label>
+          Package ID
+          <input name="packageId" type="number" min="1" value={form.packageId} onChange={onChange} required />
+        </label>
+        <label>
+          MRP
+          <input name="mrp" type="number" min="0" step="0.01" value={form.mrp} onChange={onChange} />
+        </label>
+        <label>
+          Distributor price
+          <input name="distributor_price" type="number" min="0" step="0.01" value={form.distributor_price} onChange={onChange} />
+        </label>
+        <label>
+          Franchise price
+          <input name="franchise_price" type="number" min="0" step="0.01" value={form.franchise_price} onChange={onChange} />
+        </label>
+        <label>
+          BV
+          <input name="bv" type="number" min="0" step="0.01" value={form.bv} onChange={onChange} />
+        </label>
+        <label>
+          GST %
+          <input name="gst" type="number" min="0" step="0.01" value={form.gst} onChange={onChange} />
+        </label>
+        <label>
+          Weight
+          <input name="weight" value={form.weight} onChange={onChange} />
+        </label>
+        <label>
+          Status
+          <select name="status" value={form.status} onChange={onChange}>
+            <option value="enabled">Enabled</option>
+            <option value="disabled">Disabled</option>
+          </select>
+        </label>
+        <label className="full">
+          Description
+          <textarea name="description" rows={4} value={form.description} onChange={onChange} />
+        </label>
+        <label>
+          <input name="is_hidden" type="checkbox" checked={form.is_hidden} onChange={onChange} />
+          {' '}Hide from buyers
+        </label>
+        <div className="form-actions full">
+          <button type="submit" className="btn primary" disabled={saving}>
+            {saving ? 'Saving...' : 'Save changes'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

@@ -67,6 +67,24 @@ class WEBSITE_ADMIN {
         doc.founders = normalizeFounders(body.founders);
       }
 
+      if (Array.isArray(body.heroSlides)) {
+        doc.heroSlides = body.heroSlides
+          .filter((s) => s && String(s.imageUrl || '').trim())
+          .map((s, i) => ({
+            imageUrl: String(s.imageUrl || '').trim(),
+            linkUrl: String(s.linkUrl || '').trim(),
+            title: String(s.title || '').trim(),
+            sortOrder: Number.isFinite(Number(s.sortOrder)) ? Number(s.sortOrder) : i,
+            status: s.status === 'inactive' ? 'inactive' : 'active',
+            ...(s._id ? { _id: s._id } : {})
+          }));
+        // Keep legacy single-image field in sync with first active slide
+        const firstActive = doc.heroSlides.find((s) => s.status === 'active') || doc.heroSlides[0];
+        if (body.heroImage === undefined) {
+          doc.heroImage = firstActive?.imageUrl || '';
+        }
+      }
+
       await doc.save();
 
       await AuditService.log({

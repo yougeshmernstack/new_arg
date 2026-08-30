@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order placed</title>
+</head>
+<body style="margin:0;padding:0;background:#e2e8f0;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#e2e8f0;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #94a3b8;">
+          <tr>
+            <td style="padding:20px 24px;border-bottom:3px solid #0f766e;">
+              <p style="margin:0;font-size:20px;font-weight:800;color:#0f766e;">Arogya Green Life</p>
+              <p style="margin:6px 0 0;font-size:13px;color:#4b5563;">Order confirmation</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px;">
+              <p style="margin:0 0 12px;font-size:16px;">Hello <%= name || 'Customer' %>,</p>
+              <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#374151;">
+                Your order has been placed successfully and is awaiting payment verification.
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:14px;margin-bottom:16px;">
+                <tr>
+                  <td style="padding:6px 0;color:#4b5563;">Order number</td>
+                  <td style="padding:6px 0;text-align:right;font-weight:700;"><%= order_number || orderId %></td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#4b5563;">Payment status</td>
+                  <td style="padding:6px 0;text-align:right;"><%= payment_status || 'pending' %></td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#4b5563;">Total</td>
+                  <td style="padding:6px 0;text-align:right;font-weight:700;">&#8377; <%= Number(total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                </tr>
+              </table>
+              <% if (items && items.length) { %>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:13px;margin-bottom:16px;">
+                <tr style="background:#f1f5f9;">
+                  <th align="left" style="padding:8px;border:1px solid #cbd5e1;">Item</th>
+                  <th align="right" style="padding:8px;border:1px solid #cbd5e1;">Qty</th>
+                  <th align="right" style="padding:8px;border:1px solid #cbd5e1;">Amount</th>
+                </tr>
+                <% items.forEach(function (item) { %>
+                <tr>
+                  <td style="padding:8px;border:1px solid #cbd5e1;"><%= item.product_name || item.name || 'Item' %></td>
+                  <td align="right" style="padding:8px;border:1px solid #cbd5e1;"><%= item.quantity || item.qty || 0 %></td>
+                  <td align="right" style="padding:8px;border:1px solid #cbd5e1;">&#8377; <%= Number(item.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                </tr>
+                <% }) %>
+              </table>
+              <% } %>
+              <% if (shipping) { %>
+              <p style="margin:0;font-size:13px;color:#4b5563;line-height:1.5;">
+                <strong>Shipping:</strong>
+                <%= [shipping.name, shipping.line1, shipping.line2, shipping.city, shipping.state, shipping.pincode].filter(Boolean).join(', ') %>
+              </p>
+              <% } %>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:14px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">
+              &copy; Arogya Green Life. This is an automated message.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

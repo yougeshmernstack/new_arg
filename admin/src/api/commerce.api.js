@@ -38,4 +38,8 @@ export const commerceApi = {
   getOrder: (orderId) => api.get('/get-commerce-order', { params: { orderId } }),
   updateOrderStatus: (payload) => api.post('/update-order-status', payload),
   updateShipping: (payload) => api.post('/update-order-shipping', payload),
+  verifyOrderPayment: (payload) => api.post('/verify-order-payment', payload),
+  rejectOrderPayment: (payload) => api.post('/reject-order-payment', payload),
+  downloadInvoice: (orderId) =>
+    api.get('/download-invoice', { params: { orderId }, responseType: 'blob' }),
 };

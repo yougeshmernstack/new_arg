@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PackageCard } from "@/components/PackageCard";
+import { ProductGallery } from "@/components/ProductGallery";
 import { getCatalogPackage, getCatalogPackages } from "@/lib/catalog";
 import { brand as fallbackBrand } from "@/data/brand";
 
@@ -31,20 +32,14 @@ export default async function PackageDetailPage({ params }: PackageDetailProps) 
 
   const related = allPackages.filter((item) => item.slug !== pack.slug);
   const savings = pack.compareAtPrice - pack.price;
+  const galleryImages = pack.images?.length ? pack.images : [pack.image];
+  const descriptionImages = pack.descriptionImages || [];
 
   return (
     <>
       <section className="detail-layout package-detail">
         <div className="detail-art">
-          <Image
-            className="detail-image package-detail-image"
-            src={pack.image}
-            alt={pack.name}
-            width={850}
-            height={646}
-            priority
-          />
-          <strong>{pack.badge}</strong>
+          <ProductGallery images={galleryImages} alt={pack.name} badge={pack.badge} />
         </div>
         <div className="detail-copy">
           <p className="eyebrow">Wellness package</p>
@@ -85,6 +80,30 @@ export default async function PackageDetailPage({ params }: PackageDetailProps) 
           </article>
         ) : null}
       </section>
+
+      {descriptionImages.length > 0 ? (
+        <section className="section product-desc-images">
+          <div className="section-header">
+            <div>
+              <p className="eyebrow">Package story</p>
+              <h2>Description</h2>
+            </div>
+          </div>
+          <div className="product-desc-images-stack">
+            {descriptionImages.map((src, index) => (
+              <Image
+                key={`${src}-${index}`}
+                className="product-desc-image"
+                src={src}
+                alt={`${pack.name} description ${index + 1}`}
+                width={1400}
+                height={900}
+                unoptimized={src.startsWith("http")}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {related.length > 0 ? (
         <section className="section">

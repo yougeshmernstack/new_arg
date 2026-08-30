@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { websiteApi } from '../../api';
 import { API_BASE_URL } from '../../utils/constants';
 
@@ -223,7 +224,7 @@ export default function CompanyBrand() {
           </label>
         </div>
 
-        <h3>Logo &amp; hero</h3>
+        <h3>Logo</h3>
         <div className="form-grid">
           <label>
             Logo image
@@ -237,19 +238,12 @@ export default function CompanyBrand() {
               <img className="preview-thumb" src={mediaUrl(form.logo)} alt="Logo preview" />
             ) : null}
           </label>
-          <label>
-            Hero image
-            <input
-              type="file"
-              accept="image/*"
-              disabled={uploading === 'heroImage'}
-              onChange={(e) => uploadImage('heroImage', e.target.files?.[0])}
-            />
-            {form.heroImage ? (
-              <img className="preview-thumb" src={mediaUrl(form.heroImage)} alt="Hero preview" />
-            ) : null}
-          </label>
         </div>
+        <p className="muted">
+          Theme homepage background slider is managed under{' '}
+          <Link to="/website/hero">Website → Hero Background</Link>
+          {form.heroImage ? ' (custom image is set).' : '.'}
+        </p>
 
         <div className="form-actions">
           <button type="submit" className="btn primary" disabled={saving}>

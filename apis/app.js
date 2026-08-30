@@ -1,6 +1,7 @@
 require('dotenv').config();
 require('./connections')
 require('./MODALS/wallets')
+require('./Crons')
 const express = require('express');
 const http = require('http');
 const { setupWebSocket } = require('./webSocket/broadCast');
@@ -32,18 +33,18 @@ var jsonParser = bodyParser.json();
 app.use(jsonParser)
 app.use(bodyParser.urlencoded({ extended: false }));
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, './Template/html'));
-app.use('/Template', express.static(path.join(__dirname, 'Template')));
+app.set('views', path.join(__dirname, './templete'));
+app.use('/templete', express.static(path.join(__dirname, 'templete')));
 app.get('/welcome', (req, res) => {
     const user = {
-        firstname: 'John',
-        lastname: 'Doe',
+        name: 'John Doe',
         username: 'johndoe',
         password: '123456',
-        email: 'john.doe@example.com'
+        email: 'john.doe@example.com',
+        role: 'member'
     };
     
-    res.render('welcome', user);
+    res.render('welcome-email', user);
 });
 app.use('/franchise', franchise)
 app.use('/distributor', distributor)
@@ -51,13 +52,14 @@ app.use('/theme', themeRouter)
 app.get('/send-welcome-email', async (req, res) => {
     const user = {
         firstname: 'John',
-        lastname: 'Doe',
+        name: 'John Doe',
         username: 'johndoe',
         password: '123456',
-        email: 'john.doe@example.com'
+        email: 'john.doe@example.com',
+        role: 'member'
     };
-    const subject = 'Welcome to gog!';
-    const text = 'Welcome to gog! We are excited to have you on board.';
+    const subject = 'Welcome to Arogya Green Life';
+    const text = 'Welcome to Arogya Green Life! We are excited to have you on board.';
     
     try {
         const response = await sendEmail('eracomjoginder@gmail.com', subject, text, user);

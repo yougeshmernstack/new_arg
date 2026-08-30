@@ -883,6 +883,11 @@ th {
   margin-top: 0.35rem;
 }
 
+.timeline-dot.tone-ok { background: #059669; }
+.timeline-dot.tone-warn { background: #d97706; }
+.timeline-dot.tone-danger { background: #dc2626; }
+.timeline-dot.tone-muted { background: #94a3b8; }
+
 .timeline-item p,
 .timeline-item small,
 .muted {

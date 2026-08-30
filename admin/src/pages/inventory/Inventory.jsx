@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { commerceApi } from '../../api';
+import { exportToExcel } from '../../utils/exportExcel';
+
+function statusMeta(status) {
+  if (status === 'out') return { label: 'Out of stock', tone: 'danger' };
+  if (status === 'low') return { label: 'Low stock', tone: 'warn' };
+  return { label: 'OK', tone: 'ok' };
+}
 
 export default function Inventory() {
   const [params] = useSearchParams();
@@ -10,6 +17,10 @@ export default function Inventory() {
   const [filter, setFilter] = useState(params.get('stock') || '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [busyId, setBusyId] = useState(null);
+  const [stockModal, setStockModal] = useState(null);
+  const [stockForm, setStockForm] = useState({ action: 'increase', quantity: 1, remark: '' });
 
   const load = async (stockFilter = filter) => {
     setLoading(true);
@@ -37,43 +48,90 @@ export default function Inventory() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
 
-  const statusLabel = (status) => {
-    if (status === 'out') return 'Out of stock';
-    if (status === 'low') return 'Low';
-    return 'OK';
+  const submitStock = async (e) => {
+    e.preventDefault();
+    if (!stockModal) return;
+    setBusyId(stockModal.productId);
+    setError('');
+    setMessage('');
+    try {
+      await commerceApi.updateStock({
+        productId: stockModal.productId,
+        action: stockForm.action,
+        quantity: Number(stockForm.quantity),
+        remark: stockForm.remark,
+      });
+      setMessage(`Stock updated for ${stockModal.product_name}.`);
+      setStockModal(null);
+      setStockForm({ action: 'increase', quantity: 1, remark: '' });
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update stock');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const cards = [
-    { label: 'Products', value: summary?.products ?? 0 },
-    { label: 'Remaining Stock', value: summary?.remaining_units ?? 0 },
-    { label: 'Delivered', value: summary?.delivered_units ?? 0 },
-    { label: 'In Pipeline', value: summary?.in_pipeline_units ?? 0 },
-    { label: 'Low Stock', value: summary?.low_stock_products ?? 0 },
-    { label: 'Out of Stock', value: summary?.out_of_stock_products ?? 0 },
+    { key: 'products', label: 'Products', value: summary?.products ?? 0, tone: 'default' },
+    { key: 'remaining', label: 'Remaining', value: summary?.remaining_units ?? 0, tone: 'default' },
+    { key: 'delivered', label: 'Delivered', value: summary?.delivered_units ?? 0, tone: 'ok' },
+    { key: 'pipeline', label: 'In Pipeline', value: summary?.in_pipeline_units ?? 0, tone: 'info' },
+    { key: 'low', label: 'Low Stock', value: summary?.low_stock_products ?? 0, tone: 'warn' },
+    { key: 'out', label: 'Out of Stock', value: summary?.out_of_stock_products ?? 0, tone: 'danger' },
   ];
 
   return (
-    <div className="page">
+    <div className="page inventory-page">
       <div className="page-head">
-        <h2>Inventory</h2>
-        <Link className="btn" to="/stock-history">
-          Stock History
-        </Link>
+        <div>
+          <h2>Inventory</h2>
+          <p className="page-sub">Stock remaining, pipeline and delivered units</p>
+        </div>
+        <div className="toolbar" style={{ margin: 0, padding: 0, border: 'none', background: 'transparent' }}>
+          <button
+            type="button"
+            className="btn"
+            disabled={loading || !list.length}
+            onClick={() =>
+              exportToExcel({
+                filename: 'inventory',
+                sheetName: 'Inventory',
+                rows: list,
+                columns: [
+                  { header: 'ID', value: (r) => r.productId ?? '' },
+                  { header: 'Product', value: (r) => r.product_name || '' },
+                  { header: 'SKU', value: (r) => r.sku || '' },
+                  { header: 'Remaining', value: (r) => r.remaining_stock ?? '' },
+                  { header: 'Delivered', value: (r) => r.delivered_qty ?? '' },
+                  { header: 'In Pipeline', value: (r) => r.in_pipeline_qty ?? '' },
+                  { header: 'Status', value: (r) => statusMeta(r.stock_status).label },
+                  { header: 'Hidden', value: (r) => (r.is_hidden ? 'Yes' : 'No') },
+                ],
+              })
+            }
+          >
+            Export Excel
+          </button>
+          <Link className="btn" to="/stock-history">
+            Stock History
+          </Link>
+        </div>
       </div>
 
       {!loading && summary ? (
-        <div className="stat-grid" style={{ marginBottom: 16 }}>
+        <div className="inventory-stat-grid">
           {cards.map((card) => (
-            <div key={card.label} className="stat-card">
+            <div key={card.key} className={`inventory-stat tone-${card.tone}`}>
               <span>{card.label}</span>
-              <strong>{card.value}</strong>
+              <strong>{Number(card.value).toLocaleString('en-IN')}</strong>
             </div>
           ))}
         </div>
       ) : null}
 
       <form
-        className="toolbar"
+        className="toolbar inventory-toolbar"
         onSubmit={(e) => {
           e.preventDefault();
           load();
@@ -95,12 +153,13 @@ export default function Inventory() {
       </form>
 
       {error ? <div className="alert error">{error}</div> : null}
+      {message ? <div className="alert success">{message}</div> : null}
 
       {loading ? (
-        <p>Loading...</p>
+        <p className="muted">Loading inventory…</p>
       ) : (
-        <div className="table-wrap">
-          <table>
+        <div className="table-wrap inventory-table-wrap">
+          <table className="inventory-table">
             <thead>
               <tr>
                 <th>ID</th>
@@ -110,44 +169,124 @@ export default function Inventory() {
                 <th>Delivered</th>
                 <th>In Pipeline</th>
                 <th>Status</th>
-                <th />
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>No inventory found</td>
+                  <td colSpan={8} className="inventory-empty-cell">
+                    No inventory found for this filter
+                  </td>
                 </tr>
               ) : (
-                list.map((item) => (
-                  <tr key={item.productId}>
-                    <td>{item.productId}</td>
-                    <td>
-                      {item.product_name}
-                      {item.is_hidden ? ' (hidden)' : ''}
-                    </td>
-                    <td>{item.sku}</td>
-                    <td>
-                      <strong>{item.remaining_stock}</strong>
-                    </td>
-                    <td>{item.delivered_qty}</td>
-                    <td>{item.in_pipeline_qty}</td>
-                    <td>{statusLabel(item.stock_status)}</td>
-                    <td>
-                      <Link className="btn ghost" to={`/stock-history?productId=${item.productId}`}>
-                        History
-                      </Link>
-                      <Link className="btn ghost" to={`/products/${item.productId}/edit`}>
-                        Edit
-                      </Link>
-                    </td>
-                  </tr>
-                ))
+                list.map((item) => {
+                  const meta = statusMeta(item.stock_status);
+                  return (
+                    <tr key={item.productId} className={`inventory-row status-${item.stock_status || 'ok'}`}>
+                      <td className="inventory-id">#{item.productId}</td>
+                      <td>
+                        <div className="inventory-product">
+                          <strong>{item.product_name}</strong>
+                          {item.is_hidden ? <span className="badge warn">Hidden</span> : null}
+                        </div>
+                      </td>
+                      <td className="inventory-sku">{item.sku}</td>
+                      <td>
+                        <span className={`inventory-qty ${meta.tone}`}>
+                          {item.remaining_stock}
+                        </span>
+                      </td>
+                      <td>{item.delivered_qty}</td>
+                      <td>
+                        <span className="inventory-pipeline">{item.in_pipeline_qty}</span>
+                      </td>
+                      <td>
+                        <span className={`badge ${meta.tone}`}>{meta.label}</span>
+                      </td>
+                      <td>
+                        <div className="row-actions">
+                          <button
+                            type="button"
+                            className="btn primary"
+                            disabled={busyId === item.productId}
+                            onClick={() => {
+                              setStockModal(item);
+                              setStockForm({ action: 'increase', quantity: 1, remark: '' });
+                            }}
+                          >
+                            Add / Reduce Stock
+                          </button>
+                          <Link
+                            className="btn ghost"
+                            to={`/stock-history?productId=${item.productId}`}
+                          >
+                            History
+                          </Link>
+                          <Link className="btn ghost" to={`/products/${item.productId}/edit`}>
+                            Edit
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       )}
+
+      {stockModal ? (
+        <div className="modal-backdrop" onClick={() => setStockModal(null)} role="presentation">
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
+            <h3>Add / Reduce Stock — {stockModal.product_name}</h3>
+            <p className="muted">
+              Current stock: <strong>{stockModal.remaining_stock ?? stockModal.stock}</strong>
+            </p>
+            <form className="form-grid" onSubmit={submitStock}>
+              <label>
+                Action
+                <select
+                  value={stockForm.action}
+                  onChange={(e) => setStockForm((s) => ({ ...s, action: e.target.value }))}
+                >
+                  <option value="increase">Increase (add stock)</option>
+                  <option value="decrease">Decrease (reduce stock)</option>
+                  <option value="set">Set exact stock</option>
+                </select>
+              </label>
+              <label>
+                Quantity
+                <input
+                  type="number"
+                  min={stockForm.action === 'set' ? '0' : '1'}
+                  step="1"
+                  required
+                  value={stockForm.quantity}
+                  onChange={(e) => setStockForm((s) => ({ ...s, quantity: e.target.value }))}
+                />
+              </label>
+              <label>
+                Remark (optional)
+                <input
+                  placeholder="e.g. Warehouse receipt / damaged goods"
+                  value={stockForm.remark}
+                  onChange={(e) => setStockForm((s) => ({ ...s, remark: e.target.value }))}
+                />
+              </label>
+              <div className="form-actions">
+                <button type="button" className="btn ghost" onClick={() => setStockModal(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn primary" disabled={busyId === stockModal.productId}>
+                  {busyId === stockModal.productId ? 'Saving...' : 'Update Stock'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

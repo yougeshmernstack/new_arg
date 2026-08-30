@@ -11,6 +11,7 @@ const DistributorWithdraw = require("../API/DISTRIBUTOR/Withdraw");
 const DistributorRankReward = require("../API/DISTRIBUTOR/RankReward");
 const paymentUpload = require("../utils/paymentUpload");
 const upload = require("../utils/upload");
+const OTPService = require("../SERVICES/OTPService");
 
 var distributor = express.Router();
 var jsonParser = bodyParser.json();
@@ -25,6 +26,14 @@ distributor.use((req, res, next) => authenticator.authenticateToken(req, res, ne
 
 distributor.post('/register', DistributorAuth.register);
 distributor.post('/login', DistributorAuth.login);
+distributor.post('/send-otp', (req, res, next) => {
+  req.panelRole = 'distributor';
+  return OTPService.sendOTP(req, res, next);
+});
+distributor.post('/forgot-password', (req, res, next) => {
+  req.panelRole = 'distributor';
+  return OTPService.verifyOTP(req, res, () => DistributorAuth.forgotPassword(req, res));
+});
 distributor.get('/get-dashboard', DistributorAuth.getDashboard);
 distributor.get('/get-income-history', DistributorAuth.getIncomeHistory);
 distributor.get('/get-dashboard-banners', DistributorAuth.getDashboardBanners);
@@ -48,6 +57,8 @@ distributor.post('/remove-cart-item', Storefront.removeCartItem);
 distributor.post('/checkout', Storefront.checkout);
 distributor.get('/get-orders', Storefront.myOrders);
 distributor.get('/get-order', Storefront.getOrder);
+distributor.get('/download-invoice', Storefront.downloadInvoice);
+distributor.post('/submit-order-payment', paymentUpload.single('proof'), Storefront.submitOrderPayment);
 
 // ===== Fund Wallet =====
 distributor.get('/get-payment-methods', DistributorFund.getPaymentMethods);

@@ -10,4 +10,20 @@ export const storeApi = {
   checkout: (payload) => api.post('/checkout', payload),
   getOrders: (params) => api.get('/get-orders', { params }),
   getOrder: (orderId) => api.get('/get-order', { params: { orderId } }),
+  downloadInvoice: (orderId) =>
+    api.get('/download-invoice', { params: { orderId }, responseType: 'blob' }),
+  getPaymentMethods: () => api.get('/get-payment-methods'),
+  submitOrderPayment: (formData) =>
+    api.post('/submit-order-payment', formData, {
+      headers: { 'Content-Type': undefined },
+      transformRequest: [(data, headers) => {
+        if (headers && typeof headers.set === 'function') {
+          headers.set('Content-Type', undefined);
+        } else if (headers) {
+          delete headers['Content-Type'];
+          delete headers['content-type'];
+        }
+        return data;
+      }],
+    }),
 };

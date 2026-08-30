@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { rankRewardApi } from '../../api';
+import { exportToExcel, formatExcelAmount, formatExcelDate } from '../../utils/exportExcel';
 
 const CONFIG = {
   reward: {
@@ -107,6 +108,34 @@ export default function RankAchievementList({ type }) {
     }
   };
 
+  const handleExport = () => {
+    const columns = [
+      { header: 'Username', value: (r) => r.username || '' },
+      { header: 'Name', value: (r) => r.name || '' },
+      { header: 'UID', value: (r) => r.uid ?? '' },
+      { header: 'Rank', value: (r) => r.rank_name || '' },
+      { header: 'Required BV', value: (r) => formatExcelAmount(r.matched_business) },
+      { header: 'Match BV @ Achieve', value: (r) => formatExcelAmount(r.matched_bv_at_achieve) },
+    ];
+    if (view.showAmount) {
+      columns.push({ header: 'Amount', value: (r) => formatExcelAmount(r.reward_amount) });
+    }
+    if (view.showIncome) {
+      columns.push({ header: 'Income %', value: (r) => r.income ?? '' });
+    }
+    columns.push(
+      { header: 'Item', value: (r) => r.reward_item || '' },
+      { header: 'Achieved At', value: (r) => formatExcelDate(r.achievedAt) },
+      { header: 'Status', value: (r) => (r.status === 1 ? 'Completed' : 'Pending') },
+    );
+    exportToExcel({
+      filename: `${type}_achievements`,
+      sheetName: view.title.slice(0, 31),
+      rows: list,
+      columns,
+    });
+  };
+
   return (
     <div className="page">
       <div className="page-head">
@@ -114,6 +143,9 @@ export default function RankAchievementList({ type }) {
           <h2>{view.title}</h2>
           <p>{view.subtitle}</p>
         </div>
+        <button type="button" className="btn" onClick={handleExport} disabled={loading || !list.length}>
+          Export Excel
+        </button>
       </div>
 
       <form className="toolbar" onSubmit={onSearch}>

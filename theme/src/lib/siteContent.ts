@@ -1,6 +1,13 @@
 import { brand as fallbackBrand } from '@/data/brand';
 import { mediaUrl, themeApi, type SiteContent } from '@/lib/themeApi';
 
+export type HeroSlide = {
+  id: string;
+  imageUrl: string;
+  linkUrl: string;
+  title: string;
+};
+
 export type ThemeBrand = {
   name: string;
   shortName: string;
@@ -32,6 +39,7 @@ export type ThemeBrand = {
   founders: { name: string; role: string; bio: string; photoUrl: string }[];
   logo: string;
   heroImage: string;
+  heroSlides: HeroSlide[];
 };
 
 function resolveMedia(path?: string | null, fallback = ''): string {
@@ -43,7 +51,7 @@ function resolveMedia(path?: string | null, fallback = ''): string {
 }
 
 export function mapSiteContent(data?: SiteContent | null): ThemeBrand {
-  const src = data || {};
+  const src: Partial<SiteContent> = data || {};
   return {
     name: src.name || fallbackBrand.name,
     shortName: src.shortName || fallbackBrand.shortName,
@@ -83,6 +91,22 @@ export function mapSiteContent(data?: SiteContent | null): ThemeBrand {
       })),
     logo: resolveMedia(src.logo, fallbackBrand.logo) || fallbackBrand.logo,
     heroImage: resolveMedia(src.heroImage, fallbackBrand.heroImage) || fallbackBrand.heroImage,
+    heroSlides: (() => {
+      const raw = Array.isArray(src.heroSlides) ? src.heroSlides : [];
+      const mapped = raw
+        .filter((s) => s?.imageUrl && s.status !== 'inactive')
+        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+        .map((s, i) => ({
+          id: String(s._id || `${s.imageUrl}-${i}`),
+          imageUrl: resolveMedia(s.imageUrl) || '',
+          linkUrl: (s.linkUrl || '').trim(),
+          title: (s.title || '').trim(),
+        }))
+        .filter((s) => s.imageUrl);
+      if (mapped.length > 0) return mapped;
+      const fallback = resolveMedia(src.heroImage, fallbackBrand.heroImage) || fallbackBrand.heroImage;
+      return fallback ? [{ id: 'default', imageUrl: fallback, linkUrl: '', title: '' }] : [];
+    })(),
   };
 }
 

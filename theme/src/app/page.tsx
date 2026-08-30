@@ -17,6 +17,10 @@ export default async function Home() {
   const featuredProducts = products.slice(0, 4);
   const featuredPackages = packages.slice(0, 3);
   const heroSrc = brand.heroImage || HERO_FALLBACK;
+  const heroSlides =
+    brand.heroSlides?.length > 0
+      ? brand.heroSlides
+      : [{ id: 'default', imageUrl: heroSrc, linkUrl: '', title: '' }];
   const lede =
     brand.tagline ||
     brand.subSlogan ||
@@ -29,6 +33,7 @@ export default async function Home() {
         slogan={brand.slogan || "Wellness in every sip."}
         lede={lede}
         heroSrc={heroSrc}
+        slides={heroSlides}
       />
 
       <section className="section section-catalog" id="catalog">

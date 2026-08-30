@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { distributorApi, storeApi } from '../../api';
+import { useAuth } from '../../hooks/useAuth';
 import { API_BASE_URL } from '../../utils/constants';
 
 const BANNER_WIDTH = 1200;
 const BANNER_HEIGHT = 360;
-const BANNER_INTERVAL_MS = 2000;
+const BANNER_INTERVAL_MS = 1500;
 
 function mediaUrl(path) {
   if (!path) return '';
@@ -282,12 +283,109 @@ function formatInr(value, fractionDigits = 0) {
 
 const INCOME_COLORS = ['#0f3d2e', '#1a5c40', '#2d8a5e', '#4caf50', '#7cb342', '#a8d08d', '#c9a227'];
 
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="5.5" y="5.5" width="7" height="7" rx="1.2" />
+      <path d="M10.5 5.5V4.2A1.2 1.2 0 0 0 9.3 3H4.2A1.2 1.2 0 0 0 3 4.2v5.1A1.2 1.2 0 0 0 4.2 10.5H5.5" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
+    </svg>
+  );
+}
+
+function ReferralCopyRow({ label, side, link, username }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <div className={`dash-referral-card dash-referral-card-${side}`}>
+      <div className="dash-referral-card-top">
+        <div className="dash-referral-card-label">
+          <i aria-hidden="true">{side === 'left' ? 'L' : 'R'}</i>
+          <div>
+            <strong>{label}</strong>
+            <small>Binary {side} placement</small>
+          </div>
+        </div>
+        <button
+          type="button"
+          className={`dash-referral-copy-btn${copied ? ' is-copied' : ''}`}
+          onClick={copy}
+          aria-label={`Copy ${label} referral link`}
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+          <span>{copied ? 'Copied' : 'Copy link'}</span>
+        </button>
+      </div>
+      <div className="dash-referral-url" title={link}>
+        <code>{link}</code>
+      </div>
+      <div className="dash-referral-card-meta">
+        <em>sponsor={username}</em>
+        <em>placement={side}</em>
+      </div>
+    </div>
+  );
+}
+
+function ReferralLinkCard({ username }) {
+  const links = useMemo(() => {
+    if (!username) return null;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const base = `${origin}/register?sponsor=${encodeURIComponent(username)}`;
+    return {
+      left: `${base}&placement=left`,
+      right: `${base}&placement=right`,
+    };
+  }, [username]);
+
+  if (!username || !links) return null;
+
+  return (
+    <div className="dash-panel dash-referral-panel mb-3">
+      <div className="dash-panel-head dash-referral-head">
+        <div>
+          <h3>Your Referral Links</h3>
+          <p>Share Left or Right — new distributors join on that binary side under you</p>
+        </div>
+        <span className="dash-chip dash-referral-chip">
+          <MetricIcon type="customers" />
+          Invite
+        </span>
+      </div>
+      <div className="dash-referral-grid">
+        <ReferralCopyRow label="Left team" side="left" link={links.left} username={username} />
+        <ReferralCopyRow label="Right team" side="right" link={links.right} username={username} />
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
+  const { user, profile } = useAuth();
   const [data, setData] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
   const [banners, setBanners] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const referralUsername = user?.username || profile?.username || '';
 
   useEffect(() => {
     let active = true;
@@ -385,6 +483,8 @@ export default function Dashboard() {
       <div className="dash-banner-wrap mb-3">
         <DashboardBannerSlider banners={banners} />
       </div>
+
+     
 
       <div className="row g-3 mb-3">
         <div className="col-12 col-xl-7">
@@ -688,6 +788,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      <ReferralLinkCard username={referralUsername} />
 
       <div className="row g-3 mb-3">
         <div className="col-12 col-lg-7">

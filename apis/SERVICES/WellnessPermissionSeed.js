@@ -11,6 +11,9 @@ const BUYER_STOREFRONT = (routeFor, role) => [
     { route: '/checkout', routeFor, method: 'POST', roles: [role], menuMeta: { showInMenu: false }, description: 'Checkout / place order' },
     { route: '/get-orders', routeFor, method: 'GET', roles: [role], menuMeta: { label: 'Orders', icon: 'list', order: 12, showInMenu: true }, description: 'My orders' },
     { route: '/get-order', routeFor, method: 'GET', roles: [role], menuMeta: { showInMenu: false }, description: 'Order detail' },
+    { route: '/download-invoice', routeFor, method: 'GET', roles: [role], menuMeta: { showInMenu: false }, description: 'Download paid order invoice' },
+    { route: '/get-payment-methods', routeFor, method: 'GET', roles: [role], menuMeta: { showInMenu: false }, description: 'Company bank/UPI for order payment' },
+    { route: '/submit-order-payment', routeFor, method: 'POST', roles: [role], menuMeta: { showInMenu: false }, description: 'Submit order payment UTR and proof' },
 ];
 
 const WELLNESS_PERMISSIONS = [
@@ -48,6 +51,9 @@ const WELLNESS_PERMISSIONS = [
     { route: '/get-commerce-order', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { showInMenu: false }, description: 'Commerce order detail' },
     { route: '/update-order-status', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Update order status' },
     { route: '/update-order-shipping', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Update order shipping' },
+    { route: '/verify-order-payment', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Verify order payment proof and confirm order' },
+    { route: '/reject-order-payment', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Reject order payment proof' },
+    { route: '/download-invoice', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { showInMenu: false }, description: 'Download commerce order invoice' },
 
     // Admin – fund wallet payment settings & deposits
     { route: '/get-payment-settings', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { label: 'Payment Settings', icon: 'wallet', order: 50, showInMenu: true }, description: 'Get company bank/UPI settings' },
@@ -116,8 +122,9 @@ const WELLNESS_PERMISSIONS = [
     { route: '/get-binary-tree', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Binary Tree', icon: 'users', order: 43, showInMenu: false }, description: 'Distributor binary tree view' },
     { route: '/get-packages', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Packages', icon: 'package', order: 9, showInMenu: true }, description: 'Browse activation packages' },
     { route: '/get-package', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Package detail' },
-    { route: '/purchase-package', routeFor: 'distributor', method: 'POST', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Purchase package and activate' },
-    { route: '/get-payment-methods', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Active company bank/UPI for deposits' },
+    { route: '/purchase-package', routeFor: 'distributor', method: 'POST', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Place package order awaiting payment' },
+    { route: '/get-payment-methods', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Active company bank/UPI for deposits and orders' },
+    { route: '/submit-order-payment', routeFor: 'distributor', method: 'POST', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Submit package/product order payment proof' },
     { route: '/get-fund-wallet', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { label: 'Fund Wallet', icon: 'wallet', order: 8, showInMenu: true }, description: 'Distributor fund wallet balance' },
     { route: '/submit-fund-deposit', routeFor: 'distributor', method: 'POST', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Submit fund deposit with UTR' },
     { route: '/get-fund-deposits', routeFor: 'distributor', method: 'GET', roles: ['distributor'], menuMeta: { showInMenu: false }, description: 'Distributor fund deposit history' },

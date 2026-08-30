@@ -24,7 +24,7 @@ function generateString(length) {
 // Fallback registration settings when advance_info is not seeded in DB
 const DEFAULT_REGISTRATION = {
     user_gen_method: { value: 'manual' },
-    user_gen_prefix: { value: 'AGL' },
+    user_gen_prefix: { value: 'ARG' },
     user_gen_digit: { value: 6 },
     pass_gen_method: { value: 'manual' },
     pass_gen_fun: { value: 'strong' },
@@ -47,14 +47,14 @@ class FORM_VALIDATORS {
         try { 
             // console.log("1",userName);
             const Registration = await getRegistrationSettings();
-            const { user_gen_method, user_gen_prefix, user_gen_digit } = Registration;
+            const { user_gen_method, user_gen_digit } = Registration;
             if (userName) {
                 if (user_gen_method.value === "automatic") {
                     const number =
                         Math.floor(
                             Math.random() * ((10 ** (user_gen_digit.value) - 1) - 10 ** (user_gen_digit.value - 1) + 1) + 10 ** (user_gen_digit.value - 1)
                         );
-                    const userNmae = `${user_gen_prefix.value}${number}`;
+                    const userNmae = `ARG${number}`;
                     return { status: true, userName: userNmae };
                 } else if (user_gen_method.value === "manual") {
                     var alfanum = /^[0-9a-zA-Z]+$/;
@@ -76,8 +76,8 @@ class FORM_VALIDATORS {
     async generateAutomaticUserName(prefixOverride) {
         try {
             const Registration = await getRegistrationSettings();
-            const { user_gen_prefix, user_gen_digit } = Registration;
-            const prefix = prefixOverride || user_gen_prefix?.value || 'AGL';
+            const { user_gen_digit } = Registration;
+            const prefix = 'ARG';
             const digits = Number(user_gen_digit?.value) || 6;
             const min = 10 ** (digits - 1);
             const max = 10 ** digits - 1;

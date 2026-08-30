@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 require('./connections')
 const roiClosing = require('./SERVICES/Roi');
-const withdraw = require('./API/USER/Withdraw');
+const { runAutoDistributorWithdraw } = require('./SERVICES/AutoDistributorWithdraw');
 
 // Function to run cron job for ROI income
 async function runMatchingIncomeCronJob() {
@@ -31,13 +31,6 @@ async function runUplineMatchingIncomeCronJob() {
     }
 }
 
-async function runAutoWithdrawalCronJob() {
-    try {
-        await withdraw.process_auto_withdrawals();
-    } catch (error) {
-        console.error("Error in ROI Cron Job:", error);
-    }
-}
 async function runRoiCronJob() {
     try {
         await roiClosing.roiIncome();
@@ -55,45 +48,40 @@ async function runCron_distribute_royalty_income() {
         console.error("Error in  Cron Job:", error);
     }
 }
-// async function runCron_income_release() {
-//     try {
-//         console.log("Running release Income ");
-//         await withdrawal.autoReleaseIncome();
 
-//     } catch (error) {
-//         console.error("Error in ROI Cron Job:", error);
-//     }
-// }
+async function runAutoDistributorWithdrawCronJob() {
+    try {
+        console.log('Running auto distributor withdrawal...');
+        await runAutoDistributorWithdraw();
+    } catch (error) {
+        console.error('Error in Auto Distributor Withdrawal Cron Job:', error);
+    }
+}
 
-
-// cron.schedule('30 5 * * *', () => {
-//     runRoiCronJob();
-// }, {
-//     timezone: "Asia/Kolkata"
-// });
-cron.schedule('40 5 * * *', () => {
-    runAutoWithdrawalCronJob();
-}, {
-    timezone: "Asia/Kolkata"
-});
-
-// Daily matching income closing (1:1 × 1250) — 6:00 AM IST
-cron.schedule('0 6 * * *', () => {
+// Weekly matching income closing — every Saturday 12:01 AM IST
+cron.schedule('1 0 * * 6', () => {
     runMatchingIncomeCronJob();
 }, {
     timezone: 'Asia/Kolkata'
 });
 
-// Daily repurchase matching income closing (1:1 × 500) — 6:05 AM IST
-cron.schedule('5 6 * * *', () => {
+// Weekly repurchase matching income closing — every Saturday 12:11 AM IST
+cron.schedule('11 0 * * 6', () => {
     runRepurchaseMatchingIncomeCronJob();
 }, {
     timezone: 'Asia/Kolkata'
 });
 
-// Daily upline matching income (10% of matching → active directs) — 6:10 AM IST
-cron.schedule('10 6 * * *', () => {
+// Weekly upline matching income — every Saturday 12:21 AM IST
+cron.schedule('21 0 * * 6', () => {
     runUplineMatchingIncomeCronJob();
+}, {
+    timezone: 'Asia/Kolkata'
+});
+
+// Weekly auto distributor withdrawal — every Saturday 12:31 AM IST (after income crons)
+cron.schedule('31 0 * * 6', () => {
+    runAutoDistributorWithdrawCronJob();
 }, {
     timezone: 'Asia/Kolkata'
 });
@@ -110,5 +98,5 @@ module.exports = {
     runMatchingIncomeCronJob,
     runRepurchaseMatchingIncomeCronJob,
     runUplineMatchingIncomeCronJob,
-    runAutoWithdrawalCronJob
+    runAutoDistributorWithdrawCronJob
 };

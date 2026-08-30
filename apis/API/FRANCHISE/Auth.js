@@ -124,6 +124,25 @@ class FRANCHISE_AUTH {
         }
     }
 
+    async forgotPassword(req, res) {
+        try {
+            const newPassword = req.body.newPassword || req.body.password;
+            if (!newPassword) {
+                return res.status(400).json({ code: 400, message: 'New password is required.' });
+            }
+            const isStrongPassword = await form_validator.generatePassword(newPassword);
+            if (!isStrongPassword.status) {
+                return res.status(400).json({ ...isStrongPassword });
+            }
+            const hashedPassword = await form_validator.hashPassword(isStrongPassword.password);
+            await Franchise.updateOne({ uid: req.user.uid }, { $set: { password: hashedPassword } });
+            return res.status(200).json({ ...REQUEST_SUCCESS, message: 'Password reset successfully.' });
+        } catch (error) {
+            errorLogger(error);
+            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
+        }
+    }
+
     async getDashboard(req, res) {
         try {
             const { uid } = req.user;

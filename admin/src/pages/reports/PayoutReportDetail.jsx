@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { payoutReportApi } from '../../api';
+import { exportToExcel, formatExcelAmount, formatExcelDate, fetchAllForExport } from '../../utils/exportExcel';
 
 function formatAmount(value) {
   return Number(value || 0).toLocaleString('en-IN', {
@@ -43,6 +44,7 @@ export default function PayoutReportDetail() {
   const [appliedUsername, setAppliedUsername] = useState('');
   const [appliedUid, setAppliedUid] = useState('');
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -88,6 +90,48 @@ export default function PayoutReportDetail() {
     setPage(1);
   };
 
+  const handleExport = async () => {
+    if (!slug) return;
+    setExporting(true);
+    setError('');
+    try {
+      const rows = await fetchAllForExport(async (pageNum, limit) => {
+        const params = { page: pageNum, limit };
+        if (appliedUid.trim()) params.uid = Number(appliedUid.trim());
+        else if (appliedUsername.trim()) params.username = appliedUsername.trim();
+        const res = await payoutReportApi.getBySlug(slug, params);
+        const data = res.data?.data || {};
+        const pagination = res.data?.pagination || {};
+        return {
+          rows: Array.isArray(data.items) ? data.items : [],
+          total: pagination.total,
+          pages: pagination.pages,
+        };
+      }, 500);
+
+      exportToExcel({
+        filename: `payout_${slug}`,
+        sheetName: String(label || slug).slice(0, 31),
+        rows,
+        columns: [
+          { header: 'Date', value: (r) => formatExcelDate(r.time) },
+          { header: 'UID', value: (r) => r.uid ?? '' },
+          { header: 'Username', value: (r) => r.username || '' },
+          { header: 'Name', value: (r) => r.name || '' },
+          { header: 'Amount', value: (r) => formatExcelAmount(r.amount) },
+          { header: 'Level', value: (r) => (r.level != null ? r.level : '') },
+          { header: 'Remark', value: (r) => r.remark || '' },
+          { header: 'Status', value: (r) => statusLabel(r.status) },
+          { header: 'Tx ID', value: (r) => r.tx_Id ?? '' },
+        ],
+      });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to export');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="page">
       <div className="page-head">
@@ -95,9 +139,19 @@ export default function PayoutReportDetail() {
           <h2>{label}</h2>
           <p className="page-sub">Transaction history for this income type</p>
         </div>
-        <Link className="btn ghost" to="/payout-report">
-          ← Back
-        </Link>
+        <div className="toolbar" style={{ margin: 0, padding: 0, border: 'none', background: 'transparent' }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={handleExport}
+            disabled={loading || exporting || pagination.total === 0}
+          >
+            {exporting ? 'Exporting…' : 'Export Excel'}
+          </button>
+          <Link className="btn ghost" to="/payout-report">
+            ← Back
+          </Link>
+        </div>
       </div>
 
       <div className="payout-detail-stats">

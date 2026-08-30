@@ -9,6 +9,7 @@ const form_validator = require('../../utils/form-validators');
 const { nextPanelUid } = require('../../utils/panelIdentity');
 const { ensurePanelWallet } = require('../../utils/panelWallet');
 const { errorLogger } = require('../../utils/logger');
+const Email = require('../../SERVICES/SendEmail');
 const { loginSuccess, registrationSuccess, REQUEST_SUCCESS } = require('../../utils/successMessages');
 const {
     INTERNAL_SERVER_ERROR,
@@ -38,7 +39,7 @@ class THEME_AUTH {
                 let exists = true;
                 validUserNameResult = { status: false };
                 while (attempts < 12 && exists) {
-                    validUserNameResult = await form_validator.generateAutomaticUserName('agl');
+                    validUserNameResult = await form_validator.generateAutomaticUserName('ARG');
                     if (!validUserNameResult.status) break;
                     exists = await ThemeUser.findOne({ username: validUserNameResult.userName });
                     attempts += 1;
@@ -88,6 +89,20 @@ class THEME_AUTH {
 
             await new Cart({ uid: savedUser.uid, items: [] }).save();
             await ensurePanelWallet(ThemeUserWallet, savedUser.uid);
+
+            if (savedUser.email) {
+                try {
+                    await Email.sendWelcome({
+                        email: savedUser.email,
+                        name: savedUser.name,
+                        username: savedUser.username,
+                        password: isStrongPassword.password,
+                        role: 'customer'
+                    });
+                } catch (mailErr) {
+                    errorLogger(mailErr);
+                }
+            }
 
             const payload = {
                 uid: savedUser.uid,
@@ -200,6 +215,25 @@ class THEME_AUTH {
             await ThemeUser.updateOne({ uid }, { $set: { password: hashedPassword } });
 
             return res.status(200).json({ ...REQUEST_SUCCESS, message: 'Password updated successfully.' });
+        } catch (error) {
+            errorLogger(error);
+            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
+        }
+    }
+
+    async forgotPassword(req, res) {
+        try {
+            const newPassword = req.body.newPassword || req.body.password;
+            if (!newPassword) {
+                return res.status(400).json({ code: 400, message: 'New password is required.' });
+            }
+            const isStrongPassword = await form_validator.generatePassword(newPassword);
+            if (!isStrongPassword.status) {
+                return res.status(400).json({ ...isStrongPassword });
+            }
+            const hashedPassword = await form_validator.hashPassword(isStrongPassword.password);
+            await ThemeUser.updateOne({ uid: req.user.uid }, { $set: { password: hashedPassword } });
+            return res.status(200).json({ ...REQUEST_SUCCESS, message: 'Password reset successfully.' });
         } catch (error) {
             errorLogger(error);
             return res.status(500).json({ ...INTERNAL_SERVER_ERROR });

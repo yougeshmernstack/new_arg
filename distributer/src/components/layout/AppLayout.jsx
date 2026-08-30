@@ -8,7 +8,7 @@ import '../../styles/layout.css';
 
 const links = [
   { to: '/', label: 'Dashboard', icon: 'grid', end: true },
-  { to: '/fund-wallet', label: 'Fund Wallet', icon: 'wallet' },
+  // { to: '/fund-wallet', label: 'Fund Wallet', icon: 'wallet' },
   { to: '/withdraw', label: 'Withdraw', icon: 'wallet' },
   { to: '/kyc', label: 'KYC', icon: 'user' },
   { to: '/packages', label: 'Packages', icon: 'box' },
@@ -61,7 +61,7 @@ const titles = {
   '/team/generation': ['Generation Team', 'Your full downline across all levels'],
   '/team/left': ['Left Team', 'Members on your left binary leg'],
   '/team/right': ['Right Team', 'Members on your right binary leg'],
-  '/team/binary': ['Binary Team', 'Your binary tree by parent placement'],
+  '/team/binary': ['Binary Team', 'View your binary tree'],
   '/rewards': ['Reward', 'Ranks unlocked by lifetime matched business'],
   '/royality': ['Royality', 'Royality ranks based on matched business'],
   '/traveling': ['Traveling Allowance', 'Traveling bonus based on matched business'],

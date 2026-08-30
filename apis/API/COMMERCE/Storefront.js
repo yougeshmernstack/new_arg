@@ -142,7 +142,9 @@ class STOREFRONT {
             });
             return res.status(result.duplicate ? 200 : 201).json({
                 ...REQUEST_SUCCESS,
-                message: result.duplicate ? 'Order already placed.' : 'Order placed successfully.',
+                message: result.duplicate
+                    ? 'Order already placed.'
+                    : 'Order placed successfully. Please complete payment and upload proof.',
                 data: {
                     order: result.order,
                     invoice: result.invoice,
@@ -267,7 +269,7 @@ class STOREFRONT {
                 ...REQUEST_SUCCESS,
                 message: result.duplicate
                     ? 'Package order already placed.'
-                    : 'Package purchased. Your account is now active.',
+                    : 'Package order placed. Please complete payment and upload proof.',
                 data: {
                     order: result.order,
                     invoice: result.invoice,
@@ -275,6 +277,69 @@ class STOREFRONT {
                     duplicate: result.duplicate
                 }
             });
+        } catch (error) {
+            if (error.status) {
+                return res.status(error.status).json({ code: error.status, message: error.message });
+            }
+            errorLogger(error);
+            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
+        }
+    }
+
+    async submitOrderPayment(req, res) {
+        try {
+            const orderId = Number(req.body.orderId || req.params.orderId);
+            const utr = req.body.utr;
+            if (!req.file) {
+                return res.status(400).json({ code: 400, message: 'Payment proof image is required.' });
+            }
+            const proofUrl = `/uploads/payments/${req.file.filename}`;
+            const order = await CommerceService.submitOrderPayment({
+                user: req.user,
+                orderId,
+                utr,
+                proofUrl
+            });
+            return res.status(200).json({
+                ...REQUEST_SUCCESS,
+                message: 'Payment proof submitted. Waiting for admin verification.',
+                data: { order }
+            });
+        } catch (error) {
+            if (error?.code === 11000) {
+                return res.status(400).json({ code: 400, message: 'This UTR has already been submitted.' });
+            }
+            if (error.status) {
+                return res.status(error.status).json({ code: error.status, message: error.message });
+            }
+            errorLogger(error);
+            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
+        }
+    }
+
+    async downloadInvoice(req, res) {
+        try {
+            const orderId = Number(req.query.orderId || req.params.orderId || req.body.orderId);
+            if (!orderId) {
+                return res.status(400).json({ code: 400, message: 'orderId is required.' });
+            }
+
+            const order = await CommerceOrder.findOne({
+                orderId,
+                buyer_uid: req.user.uid,
+                buyer_role: req.user.role
+            });
+            if (!order) {
+                return res.status(404).json({ code: 404, message: 'Order not found.' });
+            }
+
+            const InvoiceDocument = require('../../SERVICES/InvoiceDocument');
+            const result = await InvoiceDocument.ensurePaidInvoiceDocument(order.orderId);
+            const filename = `${result.invoice.invoice_number || `order-${orderId}`}.html`;
+
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            return res.status(200).send(result.html);
         } catch (error) {
             if (error.status) {
                 return res.status(error.status).json({ code: error.status, message: error.message });

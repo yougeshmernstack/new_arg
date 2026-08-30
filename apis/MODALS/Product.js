@@ -10,6 +10,8 @@ const productSchema = new mongoose.Schema({
     images: { type: [String], default: [] },
     videos: { type: [String], default: [] },
     description: { type: String, default: '' },
+    // Long-form description gallery (shown at bottom of product detail)
+    description_images: { type: [String], default: [] },
     ingredients: { type: String, default: '' },
     benefits: { type: [String], default: [] },
     nutrition_facts: { type: String, default: '' },

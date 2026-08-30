@@ -13,8 +13,8 @@ const PlansInfo = require('../MODALS/Plan');
 const { ensurePlanData } = PlansInfo;
 const Transaction = require('../MODALS/transactions');
 const Action = require('./Activity');
-const { getWalletBalance } = require('../utils/panelWallet');
 const { errorLogger } = require('../utils/logger');
+const Email = require('./SendEmail');
 
 const FULFILLMENT_STATUSES = [
     'confirmed',
@@ -30,6 +30,49 @@ const ORDER_TYPE_MAP = {
     franchise: 'franchise_purchase',
     theme: 'theme_purchase'
 };
+
+async function resolveCompanySnapshot() {
+    const company = (await CompanyInfo.findOne({})) || {};
+    let siteName = '';
+    try {
+        const WebsiteContent = require('../MODALS/WebsiteContent');
+        const site = await WebsiteContent.findOne({}).lean();
+        siteName = site?.name || '';
+    } catch (_) {
+        siteName = '';
+    }
+    const rawName = company.companyName || '';
+    const name = /bharat\s*batter/i.test(rawName)
+        ? (siteName || 'Arogya Green Life')
+        : (rawName || siteName || 'Arogya Green Life');
+
+    return {
+        name,
+        email: company.contactInfo?.email || '',
+        mobile: company.contactInfo?.phone || '',
+        address: [
+            company.address?.street,
+            company.address?.city,
+            company.address?.state,
+            company.address?.postalCode
+        ].filter(Boolean).join(', '),
+        gst_number: company.taxInfo?.gst || company.taxInfo?.gstin || '',
+        logo: null
+    };
+}
+
+function defaultManualPayment() {
+    return {
+        mode: 'manual',
+        utr: '',
+        proofUrl: '',
+        submitted_at: null,
+        status: 'none',
+        verified_by: null,
+        verified_at: null,
+        remark: ''
+    };
+}
 
 function priceForRole(product, role) {
     if (role === 'distributor') return product.distributor_price;
@@ -375,6 +418,7 @@ class CommerceService {
                 grand_total,
                 bv: role === 'distributor' ? roundedOrderBv : 0,
                 payment_status: 'pending',
+                payment: defaultManualPayment(),
                 order_status: 'pending',
                 dispatch_status: 'pending',
                 repurchase_bv_credited: false,
@@ -390,8 +434,8 @@ class CommerceService {
                 },
                 idempotency_key: idempotency_key ? String(idempotency_key) : undefined,
                 timeline: [{
-                    status: 'pending',
-                    remark: remark || 'Order placed',
+                    status: 'order_placed',
+                    remark: remark || 'Order placed — awaiting payment',
                     updated_by: uid,
                     updated_by_role: role,
                     updated_by_name: buyer?.name || buyer?.username || '',
@@ -401,16 +445,7 @@ class CommerceService {
 
             await order.save();
 
-            if (role === 'distributor' && roundedOrderBv > 0) {
-                await Distributor.updateOne(
-                    { uid },
-                    { $inc: { repurchase_bv: roundedOrderBv } }
-                );
-                order.repurchase_bv_credited = true;
-                await order.save();
-            }
-
-            const company = await CompanyInfo.findOne({}) || {};
+            const companyDetails = await resolveCompanySnapshot();
             const invoice = new Invoice({
                 orderId: order.orderId,
                 order_number: order.order_number,
@@ -429,19 +464,7 @@ class CommerceService {
                     ].filter(Boolean).join(', '),
                     gst_number: ''
                 },
-                company_details: {
-                    name: company.companyName || '',
-                    email: company.contactInfo?.email || '',
-                    mobile: company.contactInfo?.phone || '',
-                    address: [
-                        company.address?.street,
-                        company.address?.city,
-                        company.address?.state,
-                        company.address?.postalCode
-                    ].filter(Boolean).join(', '),
-                    gst_number: company.taxInfo?.gst || company.taxInfo?.gstin || '',
-                    logo: null
-                },
+                company_details: companyDetails,
                 items: orderItems,
                 subtotal,
                 discount: 0,
@@ -475,6 +498,20 @@ class CommerceService {
             cart.items = [];
             cart.updated_at = new Date();
             await cart.save();
+
+            try {
+                const to = invoice?.customer_details?.email;
+                if (to) {
+                    await Email.sendOrderPlaced({
+                        email: to,
+                        name: invoice.customer_details?.name,
+                        order,
+                        invoice
+                    });
+                }
+            } catch (mailErr) {
+                errorLogger(mailErr);
+            }
 
             return { order, invoice, duplicate: false };
         } catch (error) {
@@ -609,16 +646,6 @@ class CommerceService {
         const packageBv = Math.max(0, Number(pkg.bv) || 0);
         const packagePv = Math.max(0, Number(pkg.pv) || 0);
 
-        // Package purchase requires sufficient fund wallet balance
-        const fundBalance = await getWalletBalance('distributor', uid, 'fund_wallet');
-        if (fundBalance < discountedAmount) {
-            const err = new Error(
-                `Insufficient fund wallet balance. Required: ₹${discountedAmount.toFixed(2)}, Available: ₹${fundBalance.toFixed(2)}.`
-            );
-            err.status = 400;
-            throw err;
-        }
-
         const decrements = [];
         const orderItems = [];
 
@@ -719,6 +746,7 @@ class CommerceService {
                 tax: 0,
                 grand_total: discountedAmount,
                 payment_status: 'pending',
+                payment: defaultManualPayment(),
                 order_status: 'pending',
                 dispatch_status: 'pending',
                 shipping_address: {
@@ -733,8 +761,8 @@ class CommerceService {
                 },
                 idempotency_key: idempotency_key ? String(idempotency_key) : undefined,
                 timeline: [{
-                    status: 'pending',
-                    remark: remark || `Package purchased: ${pkg.name}`,
+                    status: 'order_placed',
+                    remark: remark || `Package order placed: ${pkg.name} — awaiting payment`,
                     updated_by: uid,
                     updated_by_role: 'distributor',
                     updated_by_name: distributor.name || distributor.username || '',
@@ -744,7 +772,7 @@ class CommerceService {
 
             await order.save();
 
-            const company = await CompanyInfo.findOne({}) || {};
+            const companyDetails = await resolveCompanySnapshot();
             const invoice = new Invoice({
                 orderId: order.orderId,
                 order_number: order.order_number,
@@ -763,19 +791,7 @@ class CommerceService {
                     ].filter(Boolean).join(', '),
                     gst_number: ''
                 },
-                company_details: {
-                    name: company.companyName || '',
-                    email: company.contactInfo?.email || '',
-                    mobile: company.contactInfo?.phone || '',
-                    address: [
-                        company.address?.street,
-                        company.address?.city,
-                        company.address?.state,
-                        company.address?.postalCode
-                    ].filter(Boolean).join(', '),
-                    gst_number: company.taxInfo?.gst || company.taxInfo?.gstin || '',
-                    logo: null
-                },
+                company_details: companyDetails,
                 items: orderItems,
                 subtotal: listAmount,
                 discount: packageDiscount,
@@ -790,64 +806,6 @@ class CommerceService {
             order.invoice_number = invoice.invoice_number;
             await order.save();
 
-            // Debit fund wallet for package amount
-            if (discountedAmount > 0) {
-                const savedTx = await Action.actInternally(uid, {
-                    amount: discountedAmount,
-                    activity_name: 'package_purchase',
-                    Status: 1,
-                    to_from: 'package',
-                    panel: 'distributor',
-                    order_Id: order.orderId,
-                    order_amount: discountedAmount,
-                    release: 1,
-                    note: remark || `Package purchased: ${pkg.name}`,
-                    metadata: {
-                        packageId: pkg.packageId,
-                        package_name: pkg.name,
-                        order_number: order.order_number
-                    }
-                });
-
-                if (!savedTx || !savedTx.length) {
-                    order.payment_status = 'failed';
-                    order.order_status = 'cancelled';
-                    order.dispatch_status = 'cancelled';
-                    order.timeline.push({
-                        status: 'cancelled',
-                        remark: 'Payment failed: insufficient fund wallet balance',
-                        updated_by: uid,
-                        updated_by_role: 'distributor',
-                        updated_by_name: distributor.name || distributor.username || '',
-                        updated_at: new Date()
-                    });
-                    await order.save();
-                    invoice.payment_status = 'failed';
-                    await invoice.save();
-
-                    const err = new Error(
-                        `Insufficient fund wallet balance. Required: ₹${discountedAmount.toFixed(2)}.`
-                    );
-                    err.status = 400;
-                    throw err;
-                }
-            }
-
-            order.payment_status = 'received';
-            order.order_status = 'confirmed';
-            order.timeline.push({
-                status: 'confirmed',
-                remark: `Paid ₹${discountedAmount.toFixed(2)} from fund wallet`,
-                updated_by: uid,
-                updated_by_role: 'distributor',
-                updated_by_name: distributor.name || distributor.username || '',
-                updated_at: new Date()
-            });
-            await order.save();
-
-            invoice.payment_status = 'received';
-            await invoice.save();
-
             for (const d of decrements) {
                 await new StockHistory({
                     scope: 'admin',
@@ -859,41 +817,30 @@ class CommerceService {
                     new_available: d.next,
                     reference_type: 'order',
                     reference_id: order.order_number,
-                    remark: `Package order ${order.order_number} (${pkg.name})`,
+                    remark: `Package order ${order.order_number} (${pkg.name}) — awaiting payment`,
                     created_by: uid
                 }).save();
             }
 
-            // Activate distributor immediately on package purchase
-            const activationUpdate = {
-                status: 'active',
-                activated_package_id: pkg.packageId,
-                package_bv: packageBv,
-                package_pv: packagePv
-            };
-            if (!distributor.activation_date) {
-                activationUpdate.activation_date = new Date();
+            try {
+                const to = invoice?.customer_details?.email;
+                if (to) {
+                    await Email.sendOrderPlaced({
+                        email: to,
+                        name: invoice.customer_details?.name,
+                        order,
+                        invoice
+                    });
+                }
+            } catch (mailErr) {
+                errorLogger(mailErr);
             }
-            await Distributor.updateOne(
-                { uid, status: { $ne: 'disabled' } },
-                { $set: activationUpdate }
-            );
-
-            // Direct income → sponsor gets plan_data.direct_income % of package BV
-            await this.distributePackageDirectIncome({
-                buyer: distributor,
-                packageBv,
-                order,
-                pkg
-            });
-
-            const refreshed = await Distributor.findOne({ uid }).select('-password');
 
             return {
                 order,
                 invoice,
                 duplicate: false,
-                distributor: refreshed
+                distributor: null
             };
         } catch (error) {
             if (decrements.length) {
@@ -912,6 +859,302 @@ class CommerceService {
             }
             throw error;
         }
+    }
+
+    /**
+     * Buyer submits UTR + proof screenshot for a pending order.
+     */
+    async submitOrderPayment({ user, orderId, utr, proofUrl }) {
+        const oid = Number(orderId);
+        const cleanUtr = String(utr || '').trim();
+        if (!oid) {
+            const err = new Error('orderId is required.');
+            err.status = 400;
+            throw err;
+        }
+        if (!cleanUtr) {
+            const err = new Error('UTR ID is required.');
+            err.status = 400;
+            throw err;
+        }
+        if (!proofUrl) {
+            const err = new Error('Payment proof image is required.');
+            err.status = 400;
+            throw err;
+        }
+
+        const order = await CommerceOrder.findOne({
+            orderId: oid,
+            buyer_uid: user.uid,
+            buyer_role: user.role
+        });
+        if (!order) {
+            const err = new Error('Order not found.');
+            err.status = 404;
+            throw err;
+        }
+        if (order.order_status !== 'pending') {
+            const err = new Error('Payment can only be submitted for pending orders.');
+            err.status = 400;
+            throw err;
+        }
+        if (order.payment?.status === 'verified' || order.payment_status === 'received') {
+            const err = new Error('Payment already verified for this order.');
+            err.status = 400;
+            throw err;
+        }
+        if (order.payment?.status === 'submitted') {
+            const err = new Error('Payment proof already submitted. Waiting for admin verification.');
+            err.status = 400;
+            throw err;
+        }
+
+        const utrTaken = await CommerceOrder.findOne({
+            'payment.utr': cleanUtr,
+            orderId: { $ne: oid }
+        });
+        if (utrTaken) {
+            const err = new Error('This UTR has already been submitted on another order.');
+            err.status = 400;
+            throw err;
+        }
+
+        if (!order.payment) order.payment = defaultManualPayment();
+        order.payment.mode = 'manual';
+        order.payment.utr = cleanUtr;
+        order.payment.proofUrl = proofUrl;
+        order.payment.submitted_at = new Date();
+        order.payment.status = 'submitted';
+        order.payment.remark = '';
+        order.payment.verified_by = null;
+        order.payment.verified_at = null;
+        order.payment_status = 'pending';
+        order.markModified('payment');
+        order.timeline.push({
+            status: 'payment_submitted',
+            remark: `Payment proof submitted (UTR: ${cleanUtr})`,
+            updated_by: user.uid,
+            updated_by_role: user.role,
+            updated_by_name: user.username || user.name || '',
+            updated_at: new Date()
+        });
+        await order.save();
+
+        return order;
+    }
+
+    /**
+     * Activate package + direct income after admin verifies payment.
+     */
+    async finalizePackageOrder(order, actor = {}) {
+        if (!order || order.order_type !== 'distributor_package_purchase') {
+            return { finalized: false, reason: 'not_package' };
+        }
+
+        const distributor = await Distributor.findOne({ uid: order.buyer_uid });
+        if (!distributor) {
+            const err = new Error('Distributor not found for package finalization.');
+            err.status = 404;
+            throw err;
+        }
+
+        const pkg = order.packageId
+            ? await Package.findOne({ packageId: order.packageId })
+            : null;
+        const packageBv = Math.max(0, Number(order.bv) || 0);
+        const packagePv = Math.max(0, Number(order.pv) || 0);
+
+        const activationUpdate = {
+            status: 'active',
+            activated_package_id: order.packageId,
+            package_bv: packageBv,
+            package_pv: packagePv
+        };
+        if (!distributor.activation_date) {
+            activationUpdate.activation_date = new Date();
+        }
+        await Distributor.updateOne(
+            { uid: order.buyer_uid, status: { $ne: 'disabled' } },
+            { $set: activationUpdate }
+        );
+
+        await this.distributePackageDirectIncome({
+            buyer: distributor,
+            packageBv,
+            order,
+            pkg: pkg || { packageId: order.packageId, name: order.package_name }
+        });
+
+        return { finalized: true };
+    }
+
+    /**
+     * Credit distributor repurchase BV after payment verify (product orders).
+     */
+    async creditDistributorRepurchaseBv(order) {
+        if (!order || order.order_type !== 'distributor_purchase') {
+            return { credited: false, reason: 'not_distributor_purchase' };
+        }
+        if (order.repurchase_bv_credited) {
+            return { credited: false, reason: 'already_credited' };
+        }
+        const bv = Math.round((Number(order.bv) || 0) * 100) / 100;
+        if (bv <= 0) {
+            return { credited: false, reason: 'zero_bv' };
+        }
+        await Distributor.updateOne(
+            { uid: order.buyer_uid },
+            { $inc: { repurchase_bv: bv } }
+        );
+        order.repurchase_bv_credited = true;
+        return { credited: true, bv };
+    }
+
+    /**
+     * Admin verifies manual payment → confirm order + run business side effects.
+     */
+    async verifyOrderPayment({ orderId, adminUser, remark }) {
+        const oid = Number(orderId);
+        if (!oid) {
+            const err = new Error('orderId is required.');
+            err.status = 400;
+            throw err;
+        }
+
+        const order = await CommerceOrder.findOne({ orderId: oid });
+        if (!order) {
+            const err = new Error('Order not found.');
+            err.status = 404;
+            throw err;
+        }
+        if (order.payment?.status === 'verified' && order.payment_status === 'received') {
+            const invoice = await Invoice.findOne({ orderId: order.orderId });
+            if (invoice && !invoice.pdf_path) {
+                try {
+                    const InvoiceDocument = require('./InvoiceDocument');
+                    await InvoiceDocument.generateInvoiceDocument({ invoice, order });
+                } catch (_) {
+                    /* ignore regenerate errors on already-verified path */
+                }
+            }
+            return { order, invoice, already: true };
+        }
+        if (order.payment?.status !== 'submitted') {
+            const err = new Error('No payment proof submitted for verification.');
+            err.status = 400;
+            throw err;
+        }
+        if (order.order_status !== 'pending') {
+            const err = new Error('Only pending orders can have payment verified.');
+            err.status = 400;
+            throw err;
+        }
+
+        if (!order.payment) order.payment = defaultManualPayment();
+        order.payment.status = 'verified';
+        order.payment.verified_by = adminUser?.uid || null;
+        order.payment.verified_at = new Date();
+        order.payment.remark = remark || order.payment.remark || '';
+        order.payment_status = 'received';
+        order.order_status = 'confirmed';
+        order.markModified('payment');
+        order.timeline.push({
+            status: 'confirmed',
+            remark: remark || `Payment verified (UTR: ${order.payment.utr}). Order confirmed.`,
+            updated_by: adminUser?.uid || null,
+            updated_by_role: adminUser?.role || 'admin',
+            updated_by_name: adminUser?.username || 'Admin',
+            updated_at: new Date()
+        });
+
+        if (order.order_type === 'distributor_package_purchase') {
+            await this.finalizePackageOrder(order, adminUser);
+        }
+        if (order.order_type === 'distributor_purchase') {
+            await this.creditDistributorRepurchaseBv(order);
+        }
+        if (order.order_type === 'franchise_purchase') {
+            await this.creditFranchiseInventory(order, adminUser?.uid);
+        }
+
+        await order.save();
+
+        const invoice = await Invoice.findOne({ orderId: order.orderId });
+        if (invoice) {
+            invoice.payment_status = 'received';
+            await invoice.save();
+            try {
+                const InvoiceDocument = require('./InvoiceDocument');
+                await InvoiceDocument.generateInvoiceDocument({ invoice, order });
+                try {
+                    const to = invoice?.customer_details?.email;
+                    if (to) {
+                        await Email.sendInvoiceEmail({
+                            email: to,
+                            name: invoice.customer_details?.name,
+                            order,
+                            invoice
+                        });
+                    }
+                } catch (mailErr) {
+                    errorLogger(mailErr);
+                }
+            } catch (docErr) {
+                // Payment verify must not fail if document render has an issue
+                console.error('Invoice document generation failed:', docErr.message || docErr);
+            }
+        }
+
+        return { order, invoice, already: false };
+    }
+
+    /**
+     * Admin rejects payment proof — order stays pending so buyer can re-upload.
+     */
+    async rejectOrderPayment({ orderId, adminUser, remark }) {
+        const oid = Number(orderId);
+        if (!oid) {
+            const err = new Error('orderId is required.');
+            err.status = 400;
+            throw err;
+        }
+
+        const order = await CommerceOrder.findOne({ orderId: oid });
+        if (!order) {
+            const err = new Error('Order not found.');
+            err.status = 404;
+            throw err;
+        }
+        if (order.payment?.status !== 'submitted') {
+            const err = new Error('No submitted payment proof to reject.');
+            err.status = 400;
+            throw err;
+        }
+        if (order.order_status !== 'pending') {
+            const err = new Error('Only pending orders can have payment rejected.');
+            err.status = 400;
+            throw err;
+        }
+
+        if (!order.payment) order.payment = defaultManualPayment();
+        order.payment.status = 'rejected';
+        order.payment.remark = remark || 'Payment proof rejected';
+        order.payment.verified_by = adminUser?.uid || null;
+        order.payment.verified_at = new Date();
+        // Keep UTR/proof for audit; allow re-submit by status rejected
+        order.payment_status = 'pending';
+        order.markModified('payment');
+        order.timeline.push({
+            status: 'payment_rejected',
+            remark: remark || 'Payment proof rejected — please re-submit',
+            updated_by: adminUser?.uid || null,
+            updated_by_role: adminUser?.role || 'admin',
+            updated_by_name: adminUser?.username || 'Admin',
+            updated_at: new Date()
+        });
+        await order.save();
+
+        return order;
     }
 
     /**

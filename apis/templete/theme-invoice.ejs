@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tax Invoice <%= invoice.invoice_number %></title>
+  <style>
+    :root {
+      --ink: #111827;
+      --muted: #4b5563;
+      --line: #94a3b8;
+      --soft: #f1f5f9;
+      --accent: #15803d;
+      --accent-soft: #f0fdf4;
+      --head: #14532d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #e2e8f0;
+      color: var(--ink);
+      font: 12px/1.4 Arial, Helvetica, sans-serif;
+    }
+    .toolbar {
+      max-width: 794px;
+      margin: 12px auto 8px;
+      text-align: right;
+    }
+    .toolbar button {
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      border-radius: 4px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .page {
+      width: 794px;
+      max-width: calc(100% - 16px);
+      margin: 0 auto 20px;
+      background: #fff;
+      border: 1px solid #64748b;
+      padding: 16px;
+    }
+    .head {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+    .head td {
+      vertical-align: top;
+      padding: 0 0 10px;
+      border-bottom: 2px solid var(--accent);
+    }
+    .company-name {
+      margin: 0 0 6px;
+      font-size: 20px;
+      color: var(--accent);
+      font-weight: 800;
+    }
+    .company-meta { color: var(--muted); font-size: 11px; }
+    .company-meta div { margin: 1px 0; }
+    .title-box { text-align: right; }
+    .doc-type {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      padding: 4px 8px;
+    }
+    .title-box h1 {
+      margin: 8px 0 2px;
+      font-size: 18px;
+    }
+    .title-box .sub { color: var(--muted); font-size: 11px; }
+
+    table.box {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 10px;
+      table-layout: fixed;
+    }
+    table.box th,
+    table.box td {
+      border: 1px solid #334155;
+      padding: 7px 8px;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+    table.box th {
+      background: var(--soft);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      text-align: left;
+      color: #334155;
+      font-weight: 700;
+    }
+    table.box .label {
+      display: block;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    table.box .value { font-size: 12px; font-weight: 700; }
+    .name { font-size: 13px; font-weight: 800; margin-bottom: 3px; }
+    .muted-line { margin: 1px 0; color: var(--muted); font-size: 11px; }
+
+    table.items {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 10px;
+      table-layout: fixed;
+    }
+    table.items th,
+    table.items td {
+      border: 1px solid #1e293b;
+      padding: 7px 6px;
+      vertical-align: middle;
+    }
+    table.items th {
+      background: var(--head);
+      color: #fff;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+      text-align: left;
+    }
+    table.items td { font-size: 11.5px; }
+    table.items .num { text-align: right; white-space: nowrap; }
+    table.items .center { text-align: center; }
+    table.items tbody tr:nth-child(even) td { background: #f8fafc; }
+
+    table.bottom {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 10px;
+      table-layout: fixed;
+    }
+    table.bottom > tbody > tr > td {
+      border: 1px solid #334155;
+      vertical-align: top;
+      padding: 0;
+    }
+    .words-pad, .totals-pad, .sign-pad {
+      padding: 8px 10px;
+    }
+    .section-title {
+      margin: 0 0 4px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .words-text { margin: 0; font-size: 12px; font-weight: 700; }
+    .note { margin: 6px 0 0; color: var(--muted); font-size: 10px; }
+
+    table.totals {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table.totals td {
+      border: 1px solid #334155;
+      padding: 6px 8px;
+      font-size: 11.5px;
+    }
+    table.totals td.num { text-align: right; white-space: nowrap; }
+    table.totals tr.grand td {
+      background: var(--accent-soft);
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .sign-space { height: 36px; }
+    .sign-who { font-weight: 700; }
+    .right { text-align: right; }
+
+    .footer {
+      border: 1px solid #334155;
+      padding: 6px 10px;
+      background: var(--soft);
+      color: var(--muted);
+      font-size: 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .badge-paid {
+      display: inline-block;
+      margin-left: 4px;
+      padding: 1px 6px;
+      border: 1px solid var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 9px;
+      font-weight: 800;
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+
+    @media print {
+      html, body {
+        background: #fff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+      .toolbar { display: none !important; }
+      .page {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        border: 0 !important;
+        padding: 0 !important;
+      }
+      table.box th,
+      table.box td,
+      table.items th,
+      table.items td,
+      table.bottom > tbody > tr > td,
+      table.totals td,
+      .footer {
+        border-color: #000 !important;
+      }
+      table.items th {
+        background: #111 !important;
+        color: #fff !important;
+      }
+      table.box th,
+      table.totals tr.grand td,
+      .footer,
+      .doc-type,
+      .badge-paid {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      table.items tbody tr:nth-child(even) td { background: #f3f4f6 !important; }
+      .head, .box, .items, .bottom, .footer {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      tr { page-break-inside: avoid; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button type="button" onclick="window.print()">Print / Save PDF</button>
+  </div>
+
+  <div class="page">
+    <table class="head">
+      <tr>
+        <td style="width:58%">
+          <h1 class="company-name"><%= company.name %></h1>
+          <div class="company-meta">
+            <% if (company.address) { %><div><%= company.address %></div><% } %>
+            <% if (company.mobile) { %><div>Phone: <%= company.mobile %></div><% } %>
+            <% if (company.email) { %><div>Email: <%= company.email %></div><% } %>
+            <% if (company.website) { %><div>Web: <%= company.website %></div><% } %>
+            <% if (company.gst_number) { %><div><strong>GSTIN:</strong> <%= company.gst_number %></div><% } %>
+            <% if (company.pan) { %><div><strong>PAN:</strong> <%= company.pan %></div><% } %>
+          </div>
+        </td>
+        <td class="title-box" style="width:42%">
+          <div class="doc-type">TAX INVOICE</div>
+          <h1><%= invoice.invoice_number %></h1>
+          <div class="sub"><%= role_label %> invoice</div>
+          <div class="sub">Date: <%= issued_at %></div>
+        </td>
+      </tr>
+    </table>
+
+    <table class="box">
+      <tr>
+        <td style="width:25%">
+          <span class="label">Order No.</span>
+          <span class="value"><%= order.order_number || '—' %></span>
+        </td>
+        <td style="width:25%">
+          <span class="label">Payment</span>
+          <span class="value">
+            <%= payment_status %>
+            <% if (payment_status === 'Paid') { %><span class="badge-paid">RECEIVED</span><% } %>
+          </span>
+        </td>
+        <td style="width:25%">
+          <span class="label">Mode</span>
+          <span class="value"><%= payment_mode %></span>
+        </td>
+        <td style="width:25%">
+          <span class="label">UTR / Ref.</span>
+          <span class="value"><%= payment_utr || '—' %></span>
+        </td>
+      </tr>
+    </table>
+
+    <table class="box">
+      <tr>
+        <th style="width:50%">Bill To</th>
+        <th style="width:50%">Ship To</th>
+      </tr>
+      <tr>
+        <td>
+          <div class="name"><%= customer.name %></div>
+          <% if (customer.mobile) { %><div class="muted-line">Mobile: <%= customer.mobile %></div><% } %>
+          <% if (customer.email) { %><div class="muted-line">Email: <%= customer.email %></div><% } %>
+          <% if (customer.address) { %><div class="muted-line"><%= customer.address %></div><% } %>
+          <% if (customer.gst_number) { %><div class="muted-line"><strong>GSTIN:</strong> <%= customer.gst_number %></div><% } %>
+        </td>
+        <td>
+          <div class="name"><%= customer.name %></div>
+          <% if (customer.mobile) { %><div class="muted-line">Mobile: <%= customer.mobile %></div><% } %>
+          <% if (customer.address) { %><div class="muted-line"><%= customer.address %></div><% } else { %><div class="muted-line">Same as billing address</div><% } %>
+          <% if (package_name) { %><div class="muted-line"><strong>Package:</strong> <%= package_name %></div><% } %>
+        </td>
+      </tr>
+    </table>
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th style="width:40px" class="center">#</th>
+          <th>Description</th>
+          <th style="width:90px">SKU</th>
+          <th style="width:55px" class="center">Qty</th>
+          <th style="width:95px" class="num">Rate (₹)</th>
+          <th style="width:105px" class="num">Amount (₹)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!items.length) { %>
+          <tr><td colspan="6" class="center">No items</td></tr>
+        <% } %>
+        <% items.forEach(function(item) { %>
+          <tr>
+            <td class="center"><%= item.sno %></td>
+            <td>
+              <strong><%= item.product_name %></strong>
+              <% if (item.discount > 0) { %><div class="muted-line">Discount: ₹<%= money(item.discount) %></div><% } %>
+            </td>
+            <td><%= item.sku %></td>
+            <td class="center"><%= item.quantity %></td>
+            <td class="num"><%= money(item.price) %></td>
+            <td class="num"><%= money(item.total) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <table class="bottom">
+      <tr>
+        <td style="width:58%">
+          <div class="words-pad">
+            <div class="section-title">Amount in words</div>
+            <p class="words-text"><%= amount_in_words %></p>
+            <p class="note">
+              Computer generated tax invoice for <%= role_label.toLowerCase() %> purchase.
+              <% if (order_bv > 0) { %> BV on this invoice: <strong><%= money(order_bv) %></strong>.<% } %>
+            </p>
+          </div>
+        </td>
+        <td style="width:42%">
+          <div class="totals-pad">
+            <table class="totals">
+              <tr>
+                <td>Subtotal</td>
+                <td class="num">₹<%= money(invoice.subtotal || 0) %></td>
+              </tr>
+              <tr>
+                <td>Discount</td>
+                <td class="num">₹<%= money(invoice.discount || 0) %></td>
+              </tr>
+              <tr>
+                <td>Tax / GST</td>
+                <td class="num">₹<%= money(invoice.tax || invoice.gst || 0) %></td>
+              </tr>
+              <tr class="grand">
+                <td>Grand Total</td>
+                <td class="num">₹<%= money(invoice.grand_total || 0) %></td>
+              </tr>
+            </table>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <table class="bottom">
+      <tr>
+        <td style="width:58%">
+          <div class="sign-pad">
+            <div class="section-title">Declaration</div>
+            <p class="note" style="margin:0">
+              We declare that this invoice shows the actual price of the goods/services described
+              and that all particulars are true and correct.
+            </p>
+          </div>
+        </td>
+        <td style="width:42%">
+          <div class="sign-pad right">
+            <div class="section-title">For <%= company.name %></div>
+            <div class="sign-space"></div>
+            <div class="sign-who">Authorized Signatory</div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="footer">
+      <span>Thank you for your business with <%= company.name %>.</span>
+      <span>Generated <%= generated_at %></span>
+    </div>
+  </div>
+</body>
+</html>

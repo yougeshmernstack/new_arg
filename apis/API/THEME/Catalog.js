@@ -23,6 +23,7 @@ function toCatalogProduct(product) {
     weight: product.weight || '',
     images: product.images || [],
     videos: product.videos || [],
+    description_images: product.description_images || [],
     price: product.mrp || 0,
     mrp: product.mrp || 0,
     stock: product.stock || 0,
@@ -38,6 +39,11 @@ function toCatalogPackage(pkg, productMap = {}) {
     return `${name} × ${item.quantity}`;
   });
   const coverProduct = items.map((item) => productMap[item.productId]).find((p) => p?.images?.[0]);
+  const packageImages = Array.isArray(pkg.images) ? pkg.images.filter(Boolean) : [];
+  const descriptionImages = Array.isArray(pkg.description_images)
+    ? pkg.description_images.filter(Boolean)
+    : [];
+  const coverImage = packageImages[0] || coverProduct?.images?.[0] || null;
 
   return {
     packageId: pkg.packageId,
@@ -49,7 +55,9 @@ function toCatalogPackage(pkg, productMap = {}) {
     benefits: pkg.benefits || [],
     items,
     itemNames,
-    image: coverProduct?.images?.[0] || null,
+    image: coverImage,
+    images: packageImages.length ? packageImages : (coverImage ? [coverImage] : []),
+    description_images: descriptionImages,
     status: pkg.status
   };
 }

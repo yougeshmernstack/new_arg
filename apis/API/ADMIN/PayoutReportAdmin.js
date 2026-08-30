@@ -111,7 +111,7 @@ class PayoutReportAdmin {
     try {
       const slug = String(req.query.slug || req.params.slug || '').trim();
       const page = Math.max(1, Number(req.query.page) || 1);
-      const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+      const limit = Math.min(10000, Math.max(1, Number(req.query.limit) || 50));
       const { uid, username } = req.query;
 
       if (!slug) {

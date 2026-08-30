@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { withdrawalApi } from '../../api';
+import { exportToExcel, formatExcelAmount, formatExcelDate } from '../../utils/exportExcel';
 
 function formatInr(value) {
   return Number(value || 0).toLocaleString('en-IN', {
@@ -96,6 +97,31 @@ export default function Withdrawals() {
     }
   };
 
+  const handleExport = () => {
+    exportToExcel({
+      filename: 'withdrawals',
+      sheetName: 'Withdrawals',
+      rows: list,
+      columns: [
+        { header: 'Date', value: (r) => formatExcelDate(r.createdAt) },
+        { header: 'Tx ID', value: (r) => r.tx_Id ?? '' },
+        { header: 'UID', value: (r) => r.uid ?? '' },
+        { header: 'Username', value: (r) => r.username || '' },
+        { header: 'Name', value: (r) => r.name || '' },
+        { header: 'Request Amount', value: (r) => formatExcelAmount(r.amount) },
+        { header: 'TDS', value: (r) => formatExcelAmount(r.tds) },
+        { header: 'Admin Charge', value: (r) => formatExcelAmount(r.admin_charge) },
+        { header: 'Payable', value: (r) => formatExcelAmount(r.payable) },
+        { header: 'Bank Name', value: (r) => r.account?.bankName || '' },
+        { header: 'Account Number', value: (r) => r.account?.accountNumber || '' },
+        { header: 'IFSC', value: (r) => r.account?.ifscCode || '' },
+        { header: 'Holder Name', value: (r) => r.account?.holderName || '' },
+        { header: 'Status', value: (r) => statusLabel(r.status) },
+        { header: 'Remark', value: (r) => r.remark || '' },
+      ],
+    });
+  };
+
   return (
     <div className="page">
       <div className="page-head">
@@ -112,6 +138,9 @@ export default function Withdrawals() {
           <option value="2">Rejected</option>
           <option value="all">All</option>
         </select>
+        <button type="button" className="btn" onClick={handleExport} disabled={loading || !list.length}>
+          Export Excel
+        </button>
         <button type="button" className="btn" onClick={load}>
           Refresh
         </button>

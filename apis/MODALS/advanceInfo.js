@@ -87,7 +87,7 @@ const advanceInfoSchema = new mongoose.Schema({
             },
             value: {
                 type: String,
-                default: 'BB'
+                default: 'ARG'
             }
         },
         pass_gen_method: {

@@ -114,6 +114,78 @@ export default function Dashboard() {
         />
       </section>
 
+      <section className="panel pkg-sales-panel">
+        <div className="panel-head-row">
+          <div>
+            <h3>Sales by package</h3>
+            <p className="page-sub" style={{ margin: 0 }}>
+              Each package — today and total sales
+            </p>
+          </div>
+        </div>
+
+        {(pkg.by_package || []).length === 0 ? (
+          <p className="muted">No packages found.</p>
+        ) : (
+          <>
+            <div className="pkg-sales-summary">
+              <div className="pkg-sales-summary-item">
+                <span>Today</span>
+                <strong>₹{formatMoney(pkg.todayAmount)}</strong>
+                <em>{formatNumber(pkg.todayCount)} sold</em>
+              </div>
+              <div className="pkg-sales-summary-item pkg-sales-summary-total">
+                <span>All-time total</span>
+                <strong>₹{formatMoney(pkg.totalAmount)}</strong>
+                <em>{formatNumber(pkg.totalCount)} sold</em>
+              </div>
+              <div className="pkg-sales-summary-item">
+                <span>Packages</span>
+                <strong>{formatNumber((pkg.by_package || []).length)}</strong>
+                <em>in catalog</em>
+              </div>
+            </div>
+
+            <div className="pkg-sales-list">
+              <div className="pkg-sales-list-head">
+                <span>Package</span>
+                <span>Today</span>
+                <span>Total</span>
+                <span>Share</span>
+              </div>
+              {(pkg.by_package || []).map((item) => {
+                const share =
+                  Number(pkg.totalAmount) > 0
+                    ? Math.min(100, (Number(item.totalAmount) / Number(pkg.totalAmount)) * 100)
+                    : 0;
+                return (
+                  <div key={item.packageId} className="pkg-sales-row">
+                    <div className="pkg-sales-name">
+                      <span className="pkg-sales-id">#{item.packageId}</span>
+                      <strong>{item.name}</strong>
+                    </div>
+                    <div className="pkg-sales-stat">
+                      <strong>₹{formatMoney(item.todayAmount)}</strong>
+                      <span>{formatNumber(item.todayCount)} sold</span>
+                    </div>
+                    <div className="pkg-sales-stat">
+                      <strong>₹{formatMoney(item.totalAmount)}</strong>
+                      <span>{formatNumber(item.totalCount)} sold</span>
+                    </div>
+                    <div className="pkg-sales-share">
+                      <div className="pkg-sales-bar" aria-hidden>
+                        <i style={{ width: `${share}%` }} />
+                      </div>
+                      <span>{share.toFixed(0)}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
+
       <section className="panel income-breakdown">
         <div className="panel-head-row">
           <div>

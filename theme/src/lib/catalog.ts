@@ -24,7 +24,13 @@ function parseIngredients(value?: string | string[]): string[] {
 }
 
 export function mapCatalogProduct(p: CatalogProduct): Product {
-  const image = p.images?.[0] ? mediaUrl(p.images[0]) : PLACEHOLDER_PRODUCT;
+  const images = Array.isArray(p.images)
+    ? p.images.map((src) => mediaUrl(src)).filter(Boolean)
+    : [];
+  const descriptionImages = Array.isArray(p.description_images)
+    ? p.description_images.map((src) => mediaUrl(src)).filter(Boolean)
+    : [];
+  const image = images[0] || PLACEHOLDER_PRODUCT;
   return {
     slug: String(p.productId),
     name: p.product_name,
@@ -36,6 +42,8 @@ export function mapCatalogProduct(p: CatalogProduct): Product {
     rating: 5,
     reviews: 0,
     image,
+    images,
+    descriptionImages,
     badge: p.out_of_stock ? 'Out of stock' : undefined,
     status: 'available',
     packSize: p.weight || '',
@@ -53,7 +61,14 @@ export function mapCatalogPackage(pkg: CatalogPackage): Package {
       : Array.isArray(pkg.items) && pkg.items.length
         ? pkg.items.map((item) => `Product #${item.productId} × ${item.quantity}`)
         : [];
-  const image = pkg.image ? mediaUrl(pkg.image) || PLACEHOLDER_PACKAGE : PLACEHOLDER_PACKAGE;
+  const images = Array.isArray(pkg.images)
+    ? pkg.images.map((src) => mediaUrl(src)).filter(Boolean)
+    : [];
+  const descriptionImages = Array.isArray(pkg.description_images)
+    ? pkg.description_images.map((src) => mediaUrl(src)).filter(Boolean)
+    : [];
+  const fallbackImage = pkg.image ? mediaUrl(pkg.image) : '';
+  const image = images[0] || fallbackImage || PLACEHOLDER_PACKAGE;
   return {
     slug: String(pkg.packageId),
     name: pkg.name,
@@ -61,6 +76,8 @@ export function mapCatalogPackage(pkg: CatalogPackage): Package {
     price: Number(pkg.price ?? pkg.discounted_amount) || 0,
     compareAtPrice: Number(pkg.amount) || Number(pkg.price) || 0,
     image,
+    images: images.length ? images : [image],
+    descriptionImages,
     badge: 'Package',
     includes,
     benefits: Array.isArray(pkg.benefits) ? pkg.benefits : [],

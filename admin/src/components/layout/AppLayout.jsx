@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { commerceApi } from '../../api';
 import { APP_NAME } from '../../utils/constants';
 import '../../styles/layout.css';
 
@@ -17,9 +18,9 @@ const links = [
     match: '/orders',
     icon: 'cart',
     children: [
-      { to: '/orders/franchise', label: 'Franchise Orders' },
-      { to: '/orders/distributor', label: 'Distributor Orders' },
-      { to: '/orders/theme', label: 'Theme Orders' },
+      { to: '/orders/franchise', label: 'Franchise Orders', badgeKey: 'franchise' },
+      { to: '/orders/distributor', label: 'Distributor Orders', badgeKey: 'distributor' },
+      { to: '/orders/theme', label: 'Theme Orders', badgeKey: 'theme' },
     ],
   },
   { to: '/stock-history', label: 'Stock History', icon: 'history' },
@@ -61,6 +62,7 @@ const links = [
     icon: 'globe',
     children: [
       { to: '/website/company', label: 'Company / Brand' },
+      { to: '/website/hero', label: 'Hero Background' },
       { to: '/website/about', label: 'About & Founders' },
       { to: '/website/legal', label: 'Legal Documents' },
       { to: '/website/banners', label: 'Dashboard Banners' },
@@ -232,7 +234,17 @@ function initialsFrom(name) {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-function NavGroup({ item, onNavigate }) {
+function NavBadge({ count }) {
+  const n = Number(count) || 0;
+  if (n <= 0) return null;
+  return (
+    <span className="nav-badge" aria-label={`${n} awaiting verification`}>
+      {n > 99 ? '99+' : n}
+    </span>
+  );
+}
+
+function NavGroup({ item, onNavigate, badges = {} }) {
   const location = useLocation();
   const childActive =
     item.children.some(
@@ -245,6 +257,11 @@ function NavGroup({ item, onNavigate }) {
     if (childActive) setOpen(true);
   }, [childActive]);
 
+  const groupBadge = item.children.reduce((sum, child) => {
+    if (!child.badgeKey) return sum;
+    return sum + (Number(badges[child.badgeKey]) || 0);
+  }, 0);
+
   return (
     <div className={`nav-group${open ? ' open' : ''}${childActive ? ' has-active' : ''}`}>
       <button
@@ -256,6 +273,7 @@ function NavGroup({ item, onNavigate }) {
         <span className="nav-item-main">
           {item.icon ? <Icon name={item.icon} className="nav-icon" /> : null}
           <span>{item.label}</span>
+          <NavBadge count={groupBadge} />
         </span>
         <Icon name="chevron" className={`nav-caret-icon${open ? ' open' : ''}`} />
       </button>
@@ -268,7 +286,8 @@ function NavGroup({ item, onNavigate }) {
               className={({ isActive }) => (isActive ? 'nav-link sub active' : 'nav-link sub')}
               onClick={onNavigate}
             >
-              {child.label}
+              <span className="nav-sub-label">{child.label}</span>
+              <NavBadge count={child.badgeKey ? badges[child.badgeKey] : 0} />
             </NavLink>
           ))}
         </div>
@@ -282,6 +301,11 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [orderBadges, setOrderBadges] = useState({
+    franchise: 0,
+    distributor: 0,
+    theme: 0,
+  });
 
   const displayName = user?.username || user?.name || 'Admin';
   const brandInitial = String(APP_NAME || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -294,8 +318,36 @@ export default function AppLayout() {
     navigate('/login');
   };
 
+  const loadOrderBadges = async () => {
+    try {
+      const roles = ['franchise', 'distributor', 'theme'];
+      const results = await Promise.all(
+        roles.map((role) =>
+          commerceApi.getOrders({
+            buyer_role: role,
+            payment_status: 'submitted',
+            limit: 1,
+          }),
+        ),
+      );
+      const next = {};
+      roles.forEach((role, idx) => {
+        next[role] = Number(results[idx]?.data?.pagination?.total) || 0;
+      });
+      setOrderBadges(next);
+    } catch {
+      /* keep last known counts */
+    }
+  };
+
   useEffect(() => {
     setMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    loadOrderBadges();
+    const timer = window.setInterval(loadOrderBadges, 30000);
+    return () => window.clearInterval(timer);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -339,7 +391,11 @@ export default function AppLayout() {
             <div key={link.to || link.label} className="nav-block">
               {link.section ? <div className="nav-section-label">{link.section}</div> : null}
               {link.children ? (
-                <NavGroup item={link} onNavigate={closeMenu} />
+                <NavGroup
+                  item={link}
+                  onNavigate={closeMenu}
+                  badges={link.match === '/orders' ? orderBadges : {}}
+                />
               ) : (
                 <NavLink
                   to={link.to}

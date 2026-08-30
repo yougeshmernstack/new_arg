@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { kycApi } from '../../api';
 import { API_BASE_URL } from '../../utils/constants';
+import { exportToExcel, formatExcelDate } from '../../utils/exportExcel';
 
 function mediaUrl(path) {
   if (!path) return '';
@@ -137,6 +138,30 @@ export default function KycRequests() {
           <option value="aadhaar">Aadhaar</option>
           <option value="nominee">Nominee</option>
         </select>
+        <button
+          type="button"
+          className="btn"
+          disabled={loading || !list.length}
+          onClick={() =>
+            exportToExcel({
+              filename: 'kyc_requests',
+              sheetName: 'KYC',
+              rows: list,
+              columns: [
+                { header: 'Updated', value: (r) => formatExcelDate(r.updatedAt || r.createdAt) },
+                { header: 'UID', value: (r) => r.uid ?? '' },
+                { header: 'Username', value: (r) => r.username || '' },
+                { header: 'Name', value: (r) => r.name || '' },
+                { header: 'Type', value: (r) => typeLabel(r.type) },
+                { header: 'Details', value: (r) => detailsSummary(r.type, r.details) },
+                { header: 'Status', value: (r) => statusLabel(r.status) },
+                { header: 'Remark', value: (r) => r.remark || '' },
+              ],
+            })
+          }
+        >
+          Export Excel
+        </button>
         <button type="button" className="btn" onClick={load}>
           Refresh
         </button>

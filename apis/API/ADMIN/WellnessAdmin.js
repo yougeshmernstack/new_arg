@@ -195,6 +195,8 @@ class WELLNESS_ADMIN {
                 lowStockProducts,
                 outOfStockProducts,
                 packagePurchaseAgg,
+                packageByPkgAgg,
+                packageCatalog,
                 bvPurchaseAgg,
                 incomeByTypeAgg,
                 usersActive,
@@ -243,6 +245,26 @@ class WELLNESS_ADMIN {
                         }
                     }
                 ]),
+                CommerceOrder.aggregate([
+                    { $match: packageMatch },
+                    {
+                        $group: {
+                            _id: '$packageId',
+                            package_name: { $first: '$package_name' },
+                            count: { $sum: 1 },
+                            amount: { $sum: '$grand_total' },
+                            bv: { $sum: '$bv' },
+                            todayCount: { $sum: { $cond: [todayCond, 1, 0] } },
+                            todayAmount: { $sum: { $cond: [todayCond, '$grand_total', 0] } },
+                            todayBv: { $sum: { $cond: [todayCond, '$bv', 0] } }
+                        }
+                    },
+                    { $sort: { _id: 1 } }
+                ]),
+                Package.find({ status: { $ne: 'disabled' } })
+                    .sort({ packageId: 1 })
+                    .select('packageId name price discounted_amount bv status')
+                    .lean(),
                 CommerceOrder.aggregate([
                     { $match: orderValidMatch },
                     {
@@ -377,6 +399,39 @@ class WELLNESS_ADMIN {
             const pkg = packagePurchaseAgg[0] || {};
             const bvAll = bvPurchaseAgg[0] || {};
 
+            const salesByPkgId = Object.fromEntries(
+                (packageByPkgAgg || []).map((row) => [Number(row._id), row])
+            );
+            const packageSalesItems = (packageCatalog || []).map((p) => {
+                const hit = salesByPkgId[Number(p.packageId)];
+                return {
+                    packageId: Number(p.packageId),
+                    name: p.name || `Package ${p.packageId}`,
+                    totalCount: Number(hit?.count) || 0,
+                    todayCount: Number(hit?.todayCount) || 0,
+                    totalAmount: round2(hit?.amount),
+                    todayAmount: round2(hit?.todayAmount),
+                    totalBv: round2(hit?.bv),
+                    todayBv: round2(hit?.todayBv)
+                };
+            });
+            // Include any sold packages missing from catalog (deleted/disabled)
+            for (const row of packageByPkgAgg || []) {
+                const id = Number(row._id);
+                if (!id || packageSalesItems.some((p) => p.packageId === id)) continue;
+                packageSalesItems.push({
+                    packageId: id,
+                    name: row.package_name || `Package ${id}`,
+                    totalCount: Number(row.count) || 0,
+                    todayCount: Number(row.todayCount) || 0,
+                    totalAmount: round2(row.amount),
+                    todayAmount: round2(row.todayAmount),
+                    totalBv: round2(row.bv),
+                    todayBv: round2(row.todayBv)
+                });
+            }
+            packageSalesItems.sort((a, b) => a.packageId - b.packageId);
+
             const incomeItems = incomeSlugs.map((slug) => {
                 const hit = incomeByTypeAgg.find((row) => row._id === slug);
                 return {
@@ -440,7 +495,8 @@ class WELLNESS_ADMIN {
                         totalAmount: round2(pkg.amount),
                         todayAmount: round2(pkg.todayAmount),
                         totalBv: round2(pkg.bv),
-                        todayBv: round2(pkg.todayBv)
+                        todayBv: round2(pkg.todayBv),
+                        by_package: packageSalesItems
                     },
                     bv_purchasing: {
                         totalBv: round2(bvAll.bv),

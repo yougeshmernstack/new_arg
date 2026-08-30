@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { paymentsApi } from '../../api';
 import { API_BASE_URL } from '../../utils/constants';
+import { exportToExcel, formatExcelAmount, formatExcelDate } from '../../utils/exportExcel';
 
 function mediaUrl(path) {
   if (!path) return '';
@@ -55,9 +56,35 @@ export default function FundDepositHistory() {
           <h2>Fund Deposit History</h2>
           <p>All distributor fund deposit requests and their status</p>
         </div>
-        <Link className="btn primary" to="/fund-deposits">
-          Review deposits
-        </Link>
+        <div className="toolbar" style={{ margin: 0, padding: 0, border: 'none', background: 'transparent' }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              exportToExcel({
+                filename: 'fund_deposit_history',
+                sheetName: 'Deposit History',
+                rows: list,
+                columns: [
+                  { header: 'Date', value: (r) => formatExcelDate(r.createdAt) },
+                  { header: 'UID', value: (r) => r.uid ?? '' },
+                  { header: 'Amount', value: (r) => formatExcelAmount(r.amount) },
+                  { header: 'UTR', value: (r) => r.utr || '' },
+                  { header: 'Status', value: (r) => statusLabel(r.status) },
+                  { header: 'Tx ID', value: (r) => r.creditTxId || '' },
+                  { header: 'Remark', value: (r) => r.remark || '' },
+                  { header: 'Reviewed At', value: (r) => formatExcelDate(r.reviewedAt) },
+                ],
+              })
+            }
+            disabled={loading || !list.length}
+          >
+            Export Excel
+          </button>
+          <Link className="btn primary" to="/fund-deposits">
+            Review deposits
+          </Link>
+        </div>
       </div>
 
       <div className="toolbar">

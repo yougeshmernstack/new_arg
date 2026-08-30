@@ -238,6 +238,20 @@
   display: block;
 }
 
+.sponsor-locked-hint {
+  display: block;
+  margin-top: 0.35rem;
+  color: #2d6a3e;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.register-field input[readonly] {
+  background: #f4faf6;
+  color: #1a4325;
+  cursor: default;
+}
+
 .field-placement {
   grid-column: 1 / -1;
   border: 1px solid #cfe5d5;

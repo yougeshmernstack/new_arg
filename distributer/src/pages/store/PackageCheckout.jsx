@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { storeApi, distributorApi, walletApi } from '../../api';
-import { useAuth } from '../../hooks/useAuth';
-import { storage } from '../../utils/storage';
+import { storeApi, distributorApi } from '../../api';
 
 function makeIdempotencyKey() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -14,9 +12,7 @@ function makeIdempotencyKey() {
 export default function PackageCheckout() {
   const { packageId } = useParams();
   const navigate = useNavigate();
-  const { setProfile } = useAuth();
   const [pkg, setPkg] = useState(null);
-  const [fundBalance, setFundBalance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -36,18 +32,12 @@ export default function PackageCheckout() {
     let active = true;
     (async () => {
       try {
-        const [pkgRes, profileRes, fundRes] = await Promise.all([
+        const [pkgRes, profileRes] = await Promise.all([
           storeApi.getPackage(packageId),
           distributorApi.getProfile().catch(() => null),
-          walletApi.getFundWallet().catch(() => null),
         ]);
         if (!active) return;
         setPkg(pkgRes.data?.data || null);
-        setFundBalance(
-          fundRes?.data?.data?.balance != null
-            ? Number(fundRes.data.data.balance)
-            : 0
-        );
         const dist = profileRes?.data?.distributor;
         if (dist) {
           setAddress((a) => ({
@@ -77,19 +67,12 @@ export default function PackageCheckout() {
 
   const amount = Number(pkg?.amount || 0);
   const discounted = Number(pkg?.discounted_amount ?? pkg?.price ?? 0);
-  const hasEnoughFund = fundBalance == null ? true : fundBalance >= discounted;
 
   const placeOrder = async (e) => {
     e.preventDefault();
     if (submitting || !pkg) return;
     if (!pkg.in_stock) {
       setError('Package products are out of stock.');
-      return;
-    }
-    if (!hasEnoughFund) {
-      setError(
-        `Insufficient fund wallet balance. Required: ₹${discounted.toFixed(2)}, Available: ₹${Number(fundBalance || 0).toFixed(2)}.`
-      );
       return;
     }
     setSubmitting(true);
@@ -100,26 +83,11 @@ export default function PackageCheckout() {
         shipping_address: address,
         idempotency_key: idempotencyKey,
       });
-      const distributor = res.data?.data?.distributor;
-      if (distributor) {
-        setProfile(distributor);
-        storage.setProfile(distributor);
-      }
       const orderId = res.data?.data?.order?.orderId;
       navigate(orderId ? `/orders/${orderId}` : '/orders', { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || 'Purchase failed');
       setSubmitting(false);
-      try {
-        const fundRes = await walletApi.getFundWallet();
-        setFundBalance(
-          fundRes?.data?.data?.balance != null
-            ? Number(fundRes.data.data.balance)
-            : 0
-        );
-      } catch {
-        /* ignore */
-      }
     }
   };
 
@@ -183,9 +151,9 @@ export default function PackageCheckout() {
             <button
               type="submit"
               className="btn primary"
-              disabled={submitting || !pkg.in_stock || !hasEnoughFund}
+              disabled={submitting || !pkg.in_stock}
             >
-              {submitting ? 'Purchasing...' : 'Purchase & Activate'}
+              {submitting ? 'Placing order...' : 'Place order & pay'}
             </button>
           </div>
         </form>
@@ -204,18 +172,6 @@ export default function PackageCheckout() {
           <p>
             BV: {pkg.bv ?? 0} · PV: {pkg.pv ?? 0}
           </p>
-          <p>
-            Fund wallet:{' '}
-            <strong>₹{Number(fundBalance || 0).toFixed(2)}</strong>
-            {!hasEnoughFund ? (
-              <>
-                {' '}
-                <span className="muted">(insufficient)</span>
-                {' · '}
-                <Link to="/fund-wallet">Add funds</Link>
-              </>
-            ) : null}
-          </p>
           <ul className="summary-list">
             {(pkg.items || []).map((item) => (
               <li key={item.productId}>
@@ -226,7 +182,8 @@ export default function PackageCheckout() {
             ))}
           </ul>
           <p className="muted">
-            Amount is deducted from your fund wallet. On success your account becomes active immediately.
+            After placing the order you will see company bank/UPI details. Pay the amount and upload
+            your payment screenshot. Your package activates after admin verifies the payment.
           </p>
         </section>
       </div>

@@ -10,6 +10,7 @@ import Notifications from '../pages/notifications/Notifications';
 import Products from '../pages/store/Products';
 import ProductDetail from '../pages/store/ProductDetail';
 import Packages from '../pages/store/Packages';
+import PackageDetail from '../pages/store/PackageDetail';
 import PackageCheckout from '../pages/store/PackageCheckout';
 import Cart from '../pages/store/Cart';
 import Checkout from '../pages/store/Checkout';
@@ -38,6 +39,7 @@ export default function AppRoutes() {
             <Route path="withdraw" element={<Withdraw />} />
             <Route path="kyc" element={<Kyc />} />
             <Route path="packages" element={<Packages />} />
+            <Route path="packages/:packageId" element={<PackageDetail />} />
             <Route path="packages/:packageId/checkout" element={<PackageCheckout />} />
             <Route path="products" element={<Products />} />
             <Route path="products/:productId" element={<ProductDetail />} />

@@ -2,42 +2,67 @@ const nodemailer = require('nodemailer');
 const ejs = require('ejs');
 const path = require('path');
 
+const TEMPLETE_DIR = path.join(__dirname, '../templete');
+
 class MailerService {
-    constructor() {
-        // Configure the transporter with the provided SMTP details
-        this.transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || 'smtpout.secureserver.net', // SMTP server host
-            port: process.env.SMTP_PORT || 465, // SMTP server port
-            secure: true, // true for 465, false for other ports
-            auth: {
-                user: process.env.SMTP_USER || 'support@epicworld.tech', // SMTP user
-                pass: process.env.SMTP_PASS || 'Worlddynamik7056#$', // SMTP password
-            },
-        });
+    getTransporter() {
+        const port = Number(process.env.SMTP_PORT) || 465;
+        if (!this._transporter || this._smtpKey !== `${process.env.SMTP_HOST}:${port}:${process.env.SMTP_USER}`) {
+            this._smtpKey = `${process.env.SMTP_HOST}:${port}:${process.env.SMTP_USER}`;
+            this._transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST,
+                port,
+                secure: port === 465,
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS,
+                },
+                greetingTimeout: 30000,
+            });
+        }
+        return this._transporter;
     }
 
-    async sendMail(to, subject, template, data) {
-        try {
-            // Render the .ejs template with provided data
-            const html = await ejs.renderFile(
-                path.join(__dirname, '../Template/html/', `${template}.ejs`),
-                data
-            );
-
-            const mailOptions = {
-                from: process.env.FROM_EMAIL || 'support@epicworld.tech', // Sender address
-                to, // Recipient address
-                subject, // Subject line
-                html, // Rendered HTML content
-            };
-
-            // Send the email
-            await this.transporter.sendMail(mailOptions);
-            console.log(`Email sent to ${to} successfully.`);
-        } catch (error) {
-            console.error('Error sending mail:', error.message);
-            throw new Error('Failed to send email');
+    /**
+     * @param {string} to
+     * @param {string} subject
+     * @param {string} template - ejs basename without extension under apis/templete/
+     * @param {object} data
+     * @param {Array} [attachments] - nodemailer attachments
+     */
+    async sendMail(to, subject, template, data = {}, attachments) {
+        if (!to) {
+            throw new Error('Recipient email is required');
         }
+        if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+            throw new Error('SMTP is not configured in environment');
+        }
+
+        const html = await ejs.renderFile(
+            path.join(TEMPLETE_DIR, `${template}.ejs`),
+            data
+        );
+
+        const mailOptions = {
+            from: process.env.FROM_EMAIL || process.env.SMTP_USER,
+            to,
+            subject,
+            html,
+        };
+        if (attachments && attachments.length) {
+            mailOptions.attachments = attachments;
+        }
+
+        await this.getTransporter().sendMail(mailOptions);
+        console.log(`Email sent to ${to} successfully (${template}).`);
+        return { success: true };
+    }
+
+    async verifySmtp() {
+        if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+            throw new Error('SMTP is not configured in environment');
+        }
+        return this.getTransporter().verify();
     }
 }
 

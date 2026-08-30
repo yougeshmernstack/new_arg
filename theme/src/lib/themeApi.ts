@@ -40,6 +40,7 @@ export type ShopProduct = {
   weight?: string;
   images?: string[];
   videos?: string[];
+  description_images?: string[];
 };
 
 export type CatalogProduct = ShopProduct & {
@@ -59,6 +60,8 @@ export type CatalogPackage = {
   items?: { productId: number; quantity: number }[];
   itemNames?: string[];
   image?: string | null;
+  images?: string[];
+  description_images?: string[];
   status?: string;
 };
 
@@ -93,6 +96,14 @@ export type SiteContent = {
   founders?: { name: string; role: string; bio: string; photoUrl: string }[];
   logo?: string;
   heroImage?: string;
+  heroSlides?: {
+    _id?: string;
+    imageUrl?: string;
+    linkUrl?: string;
+    title?: string;
+    sortOrder?: number;
+    status?: string;
+  }[];
 };
 
 export type LegalDoc = {
@@ -164,6 +175,44 @@ export const themeApi = {
   getOrders: () => request('/get-orders?limit=50'),
   getOrder: (orderId: number | string) =>
     request(`/get-order?orderId=${orderId}`),
+  downloadInvoice: async (orderId: number | string) => {
+    const token = getThemeToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = token;
+    const res = await fetch(`${API_BASE}${API_PREFIX}/download-invoice?orderId=${orderId}`, {
+      method: 'GET',
+      headers,
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.message || `Request failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('content-disposition') || '';
+    const match = /filename="?([^"]+)"?/i.exec(disposition);
+    return { blob, filename: match?.[1] || `invoice-${orderId}.html` };
+  },
+  getPaymentMethods: () => request('/get-payment-methods'),
+  submitOrderPayment: async (formData: FormData) => {
+    const token = getThemeToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = token;
+    const res = await fetch(`${API_BASE}${API_PREFIX}/submit-order-payment`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message = data?.message || `Request failed (${res.status})`;
+      const error = new Error(message) as Error & { status?: number; data?: unknown };
+      error.status = res.status;
+      error.data = data;
+      throw error;
+    }
+    return data;
+  },
 
   // Public catalog / CMS
   getSiteContent: () => publicRequest('/get-site-content'),

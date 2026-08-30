@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import BrandLogo from '../../components/common/BrandLogo';
 import { getApiErrorMessage } from '../../utils/apiError';
@@ -30,9 +30,21 @@ const SIDE_OPTIONS = [
 export default function Register() {
   const { register, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState(initial);
+  const [searchParams] = useSearchParams();
+  const sponsorFromUrl = (searchParams.get('sponsor') || '').trim();
+  const placementFromUrl = String(searchParams.get('placement') || '')
+    .trim()
+    .toLowerCase();
+  const placementLocked =
+    placementFromUrl === 'left' || placementFromUrl === 'right';
+  const [form, setForm] = useState(() => ({
+    ...initial,
+    sponsor_Id: sponsorFromUrl,
+    placement: placementLocked ? placementFromUrl : 'left',
+  }));
   const [error, setError] = useState('');
   const [generatedUsername, setGeneratedUsername] = useState('');
+  const sponsorLocked = Boolean(sponsorFromUrl);
 
   if (isAuthenticated && !generatedUsername) return <Navigate to="/" replace />;
 
@@ -95,24 +107,33 @@ export default function Register() {
           {error ? <div className="alert error">{error}</div> : null}
           <p className="auth-note">Username will be generated automatically after registration.</p>
           <div className="register-fields">
-            {fields.map((field) => (
-              <label key={field.name} className={`register-field field-${field.name}`}>
-                <span>{field.label}</span>
-                <input
-                  name={field.name}
-                  type={field.type}
-                  value={form[field.name]}
-                  onChange={onChange}
-                  placeholder={field.placeholder}
-                  autoComplete={field.autoComplete}
-                  required
-                />
-              </label>
-            ))}
+            {fields.map((field) => {
+              const isSponsor = field.name === 'sponsor_Id';
+              return (
+                <label key={field.name} className={`register-field field-${field.name}`}>
+                  <span>{field.label}</span>
+                  <input
+                    name={field.name}
+                    type={field.type}
+                    value={form[field.name]}
+                    onChange={onChange}
+                    placeholder={field.placeholder}
+                    autoComplete={field.autoComplete}
+                    required
+                    readOnly={isSponsor && sponsorLocked}
+                  />
+                  {isSponsor && sponsorLocked ? (
+                    <small className="sponsor-locked-hint">Filled from your referral link</small>
+                  ) : null}
+                </label>
+              );
+            })}
             <fieldset className="register-field field-placement">
               <legend>Binary placement</legend>
               <p className="placement-hint">
-                Choose Left or Right. Placement under your sponsor follows the binary spillover rule automatically.
+                {placementLocked
+                  ? 'Placement is set from your referral link.'
+                  : 'Choose Left or Right. Placement under your sponsor follows the binary spillover rule automatically.'}
               </p>
               <div className="placement-options">
                 {SIDE_OPTIONS.map((opt) => (
@@ -120,7 +141,12 @@ export default function Register() {
                     key={opt.value}
                     type="button"
                     className={`placement-option${form.placement === opt.value ? ' is-selected' : ''}`}
-                    onClick={() => setForm((p) => ({ ...p, placement: opt.value }))}
+                    onClick={() => {
+                      if (placementLocked) return;
+                      setForm((p) => ({ ...p, placement: opt.value }));
+                    }}
+                    disabled={placementLocked && form.placement !== opt.value}
+                    aria-pressed={form.placement === opt.value}
                   >
                     <span className="placement-label">{opt.label}</span>
                   </button>

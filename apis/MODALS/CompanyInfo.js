@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const companySchema = new mongoose.Schema({
   companyName: {
     type: String,
-    default :'BHARAT BATTERIES' },
+    default :'Arogya Green Life' },
   address: {
     street: {
       type: String,
@@ -31,7 +31,7 @@ const companySchema = new mongoose.Schema({
     },
     website: {
       type: String,
-      default:'https://bharatbatteries.info'
+      default:'https://arogyagreenlife.com'
     }
   },
   taxInfo: {
@@ -68,11 +68,11 @@ token:{
 },
 currency_sign:{
     type:String,
-    default:'$'
+    default:'₹'
 },
 token_sign:{
     type:String,
-    default:'$'
+    default:'₹'
 },
 coin_buy_price:{
   type:Number,

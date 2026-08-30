@@ -82,7 +82,7 @@ export default function ShopCheckoutPage() {
           </label>
         ))}
         <button className="button" type="submit" disabled={submitting || !items.length}>
-          {submitting ? 'Placing order...' : 'Place order'}
+          {submitting ? 'Placing order...' : 'Place order & pay'}
         </button>
       </form>
     </section>

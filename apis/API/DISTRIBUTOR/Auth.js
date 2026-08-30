@@ -4,6 +4,7 @@ const Distributor = require('../../MODALS/Distributor');
 const DistributorWallet = require('../../MODALS/DistributorWallet');
 const Franchise = require('../../MODALS/Franchise');
 const AdminData = require('../../MODALS/AdminData');
+const Package = require('../../MODALS/Package');
 const CommerceOrder = require('../../MODALS/CommerceOrder');
 const Transaction = require('../../MODALS/transactions');
 const Wallets = require('../../MODALS/wallets');
@@ -11,6 +12,7 @@ const form_validator = require('../../utils/form-validators');
 const { nextPanelUid } = require('../../utils/panelIdentity');
 const { ensurePanelWallet, ensureWalletSlug } = require('../../utils/panelWallet');
 const { errorLogger } = require('../../utils/logger');
+const Email = require('../../SERVICES/SendEmail');
 const { loginSuccess, registrationSuccess, REQUEST_SUCCESS } = require('../../utils/successMessages');
 const {
     resolvePlacement,
@@ -152,7 +154,7 @@ class DISTRIBUTOR_AUTH {
                 let exists = true;
                 validUserNameResult = { status: false };
                 while (attempts < 12 && exists) {
-                    validUserNameResult = await form_validator.generateAutomaticUserName('dist');
+                    validUserNameResult = await form_validator.generateAutomaticUserName('ARG');
                     if (!validUserNameResult.status) break;
                     exists = await Distributor.findOne({ username: validUserNameResult.userName });
                     attempts += 1;
@@ -217,6 +219,18 @@ class DISTRIBUTOR_AUTH {
                 throw saveErr;
             }
             await ensurePanelWallet(DistributorWallet, uid);
+
+            try {
+                await Email.sendWelcome({
+                    email: distributor.email,
+                    name: distributor.name,
+                    username: distributor.username,
+                    password: isStrongPassword.password,
+                    role: 'distributor'
+                });
+            } catch (mailErr) {
+                errorLogger(mailErr);
+            }
 
             const payload = {
                 uid: distributor.uid,
@@ -343,6 +357,25 @@ class DISTRIBUTOR_AUTH {
             await Distributor.updateOne({ uid }, { $set: { password: hashedPassword } });
 
             return res.status(200).json({ ...REQUEST_SUCCESS, message: 'Password updated successfully.' });
+        } catch (error) {
+            errorLogger(error);
+            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
+        }
+    }
+
+    async forgotPassword(req, res) {
+        try {
+            const newPassword = req.body.newPassword || req.body.password;
+            if (!newPassword) {
+                return res.status(400).json({ code: 400, message: 'New password is required.' });
+            }
+            const isStrongPassword = await form_validator.generatePassword(newPassword);
+            if (!isStrongPassword.status) {
+                return res.status(400).json({ ...isStrongPassword });
+            }
+            const hashedPassword = await form_validator.hashPassword(isStrongPassword.password);
+            await Distributor.updateOne({ uid: req.user.uid }, { $set: { password: hashedPassword } });
+            return res.status(200).json({ ...REQUEST_SUCCESS, message: 'Password reset successfully.' });
         } catch (error) {
             errorLogger(error);
             return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
@@ -535,13 +568,25 @@ class ADMIN_DISTRIBUTOR {
             const skip = (page - 1) * limit;
             const filter = {};
             if (req.query.status) filter.status = req.query.status;
+            if (req.query.package_bv != null && String(req.query.package_bv).trim() !== '') {
+                const packageBv = Number(req.query.package_bv);
+                if (Number.isFinite(packageBv)) {
+                    filter.package_bv = packageBv;
+                }
+            }
             if (req.query.search) {
-                filter.$or = [
-                    { name: { $regex: req.query.search, $options: 'i' } },
-                    { email: { $regex: req.query.search, $options: 'i' } },
-                    { mobile: { $regex: req.query.search, $options: 'i' } },
-                    { username: { $regex: req.query.search, $options: 'i' } }
+                const search = String(req.query.search).trim();
+                const or = [
+                    { name: { $regex: search, $options: 'i' } },
+                    { email: { $regex: search, $options: 'i' } },
+                    { mobile: { $regex: search, $options: 'i' } },
+                    { username: { $regex: search, $options: 'i' } }
                 ];
+                const asNum = Number(search);
+                if (Number.isFinite(asNum) && String(asNum) === search) {
+                    or.push({ uid: asNum }, { distributorId: asNum });
+                }
+                filter.$or = or;
             }
 
             const [list, total] = await Promise.all([
@@ -557,6 +602,72 @@ class ADMIN_DISTRIBUTOR {
                 : [];
             const parentMap = new Map(parents.map((p) => [Number(p.uid), p]));
 
+            const packageIds = [
+                ...new Set(
+                    list
+                        .map((d) => Number(d.activated_package_id))
+                        .filter((id) => Number.isFinite(id) && id > 0)
+                )
+            ];
+            const packages = packageIds.length
+                ? await Package.find({ packageId: { $in: packageIds } })
+                    .select('packageId name bv pv discounted_amount')
+                    .lean()
+                : [];
+            const packageMap = new Map(packages.map((pkg) => [Number(pkg.packageId), pkg]));
+
+            // Highest package by BV from confirmed package purchases (fallback / upgrade-safe)
+            const buyerUids = [...new Set(list.map((d) => Number(d.uid)).filter(Boolean))];
+            const highestByUid = new Map();
+            if (buyerUids.length) {
+                const highestRows = await CommerceOrder.aggregate([
+                    {
+                        $match: {
+                            buyer_uid: { $in: buyerUids },
+                            order_type: 'distributor_package_purchase',
+                            order_status: {
+                                $in: [
+                                    'confirmed',
+                                    'packed',
+                                    'shipped',
+                                    'in_transit',
+                                    'out_for_delivery',
+                                    'delivered'
+                                ]
+                            }
+                        }
+                    },
+                    { $sort: { bv: -1, created_date: -1 } },
+                    {
+                        $group: {
+                            _id: '$buyer_uid',
+                            packageId: { $first: '$packageId' },
+                            package_name: { $first: '$package_name' },
+                            bv: { $first: '$bv' }
+                        }
+                    }
+                ]);
+                for (const row of highestRows) {
+                    highestByUid.set(Number(row._id), row);
+                }
+            }
+
+            const missingHighestPkgIds = [
+                ...new Set(
+                    [...highestByUid.values()]
+                        .map((row) => Number(row.packageId))
+                        .filter((id) => Number.isFinite(id) && id > 0 && !packageMap.has(id))
+                )
+            ];
+            if (missingHighestPkgIds.length) {
+                const extraPkgs = await Package.find({ packageId: { $in: missingHighestPkgIds } })
+                    .select('packageId name bv pv discounted_amount')
+                    .lean();
+                for (const pkg of extraPkgs) {
+                    packageMap.set(Number(pkg.packageId), pkg);
+                }
+            }
+
             const sponsorCache = new Map();
             const data = await Promise.all(
                 list.map(async (doc) => {
@@ -571,12 +682,40 @@ class ADMIN_DISTRIBUTOR {
                     const sponsor = sponsorCache.get(sponsorKey);
                     const parent = item.parent_Id != null ? parentMap.get(Number(item.parent_Id)) : null;
 
+                    const activatedPkg = item.activated_package_id != null
+                        ? packageMap.get(Number(item.activated_package_id))
+                        : null;
+                    const highestOrder = highestByUid.get(Number(item.uid));
+                    const highestPkg = highestOrder?.packageId != null
+                        ? packageMap.get(Number(highestOrder.packageId))
+                        : null;
+
+                    const useHighest =
+                        highestOrder &&
+                        Number(highestOrder.bv || 0) >= Number(item.package_bv || 0);
+
+                    const packageId = useHighest
+                        ? Number(highestOrder.packageId) || null
+                        : item.activated_package_id != null
+                            ? Number(item.activated_package_id)
+                            : null;
+                    const packageName = useHighest
+                        ? (highestPkg?.name || highestOrder.package_name || '')
+                        : (activatedPkg?.name || '');
+                    const packageBv = useHighest
+                        ? Number(highestOrder.bv || 0)
+                        : Number(item.package_bv || activatedPkg?.bv || 0);
+
                     return {
                         ...item,
                         sponsor_username: sponsor?.username || null,
                         sponsor_name: sponsor?.name || null,
                         parent_username: parent?.username || null,
-                        parent_name: parent?.name || null
+                        parent_name: parent?.name || null,
+                        package_name: packageName || null,
+                        highest_package_id: packageId,
+                        highest_package_name: packageName || null,
+                        highest_package_bv: packageBv
                     };
                 })
             );
@@ -585,7 +724,7 @@ class ADMIN_DISTRIBUTOR {
                 status: 200,
                 message: 'Distributors fetched.',
                 data,
-                pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+                pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit) || 1) }
             });
         } catch (error) {
             errorLogger(error);

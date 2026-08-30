@@ -125,7 +125,7 @@ export default function Checkout() {
           </label>
           <div className="form-actions full">
             <button type="submit" className="btn primary" disabled={submitting}>
-              {submitting ? 'Placing order...' : 'Place order'}
+              {submitting ? 'Placing order...' : 'Place order & pay'}
             </button>
           </div>
         </form>
@@ -144,7 +144,9 @@ export default function Checkout() {
           <p>
             <strong>Subtotal: ₹{subtotal.toFixed(2)}</strong>
           </p>
-          <p className="muted">Stock is re-validated and deducted only after a successful order.</p>
+          <p className="muted">
+            After placing the order, pay via company bank/UPI and upload your payment screenshot on the order page.
+          </p>
         </section>
       </div>
     </div>

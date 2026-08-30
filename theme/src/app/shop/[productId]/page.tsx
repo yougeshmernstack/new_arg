@@ -51,6 +51,11 @@ export default function ShopProductDetailPage() {
     return [...images, ...videos];
   }, [product]);
 
+  const descImages = useMemo(
+    () => (product?.description_images || []).filter(Boolean),
+    [product]
+  );
+
   const activeItem = galleryItems[activeIndex] || null;
 
   const addToCart = async () => {
@@ -246,6 +251,23 @@ export default function ShopProductDetailPage() {
             ) : null}
           </div>
         </div>
+
+        {descImages.length > 0 ? (
+          <section className="product-desc-images shop-desc-images">
+            <h2>Description</h2>
+            <div className="product-desc-images-stack">
+              {descImages.map((src, index) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`${src}-${index}`}
+                  className="product-desc-image"
+                  src={mediaUrl(src)}
+                  alt={`${product.product_name} description ${index + 1}`}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
       </section>
     </>
   );

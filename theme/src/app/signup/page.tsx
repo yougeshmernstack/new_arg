@@ -5,6 +5,11 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { setThemeToken, themeApi } from '@/lib/themeApi';
 
+const DISTRIBUTOR_LOGIN =
+  process.env.NEXT_PUBLIC_DISTRIBUTOR_LOGIN_URL || 'http://192.168.18.20:3001/login';
+const FRANCHISE_LOGIN =
+  process.env.NEXT_PUBLIC_FRANCHISE_LOGIN_URL || 'http://192.168.18.20:3002/login';
+
 export default function SignupPage() {
   const router = useRouter();
   const [name, setName] = useState('');
@@ -115,6 +120,16 @@ export default function SignupPage() {
         <Link className="button button-soft login-portal-btn" href="/login">
           Sign in
         </Link>
+      </div>
+
+      <div className="login-portal-links">
+        <p className="login-portal-label">Other portals</p>
+        <a className="button button-soft login-portal-btn" href={DISTRIBUTOR_LOGIN}>
+          Distributor login
+        </a>
+        <a className="button button-soft login-portal-btn" href={FRANCHISE_LOGIN}>
+          Franchise login
+        </a>
       </div>
     </section>
   );

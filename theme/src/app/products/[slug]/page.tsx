@@ -6,6 +6,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { getCatalogProduct, getCatalogProducts } from "@/lib/catalog";
 import { getSiteBrand } from "@/lib/siteContent";
 import { brand as fallbackBrand } from "@/data/brand";
+import { ProductGallery } from "@/components/ProductGallery";
 
 type ProductDetailProps = {
   params: Promise<{
@@ -35,21 +36,14 @@ export default async function ProductDetailPage({ params }: ProductDetailProps) 
   }
 
   const related = allProducts.filter((item) => item.slug !== product.slug).slice(0, 3);
+  const galleryImages = product.images?.length ? product.images : [product.image];
+  const descriptionImages = product.descriptionImages || [];
 
   return (
     <>
       <section className="detail-layout">
         <div className="detail-art">
-          <Image
-            className="detail-image"
-            src={product.image}
-            alt={product.name}
-            width={760}
-            height={760}
-            priority
-            unoptimized={product.image.startsWith("http")}
-          />
-          {product.badge ? <strong>{product.badge}</strong> : null}
+          <ProductGallery images={galleryImages} alt={product.name} badge={product.badge} />
         </div>
         <div className="detail-copy">
           <p className="eyebrow">{product.category}</p>
@@ -99,6 +93,30 @@ export default async function ProductDetailPage({ params }: ProductDetailProps) 
           </article>
         ) : null}
       </section>
+
+      {descriptionImages.length > 0 ? (
+        <section className="section product-desc-images">
+          <div className="section-header">
+            <div>
+              <p className="eyebrow">Product story</p>
+              <h2>Description</h2>
+            </div>
+          </div>
+          <div className="product-desc-images-stack">
+            {descriptionImages.map((src, index) => (
+              <Image
+                key={`${src}-${index}`}
+                className="product-desc-image"
+                src={src}
+                alt={`${product.name} description ${index + 1}`}
+                width={1400}
+                height={900}
+                unoptimized={src.startsWith("http")}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {related.length > 0 ? (
         <section className="section">

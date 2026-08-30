@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { dummyBusinessApi } from '../../api';
+import { exportToExcel, formatExcelAmount, formatExcelDate } from '../../utils/exportExcel';
 
 function formatTime(value) {
   if (!value) return '—';
@@ -65,9 +66,35 @@ export default function DummyBusinessHistory() {
           <h2>Dummy Business History</h2>
           <p>Who received how much dummy BV, which side, and when</p>
         </div>
-        <Link className="btn primary" to="/dummy-business">
-          Grant Dummy Business
-        </Link>
+        <div className="toolbar" style={{ margin: 0, padding: 0, border: 'none', background: 'transparent' }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              exportToExcel({
+                filename: 'dummy_business_history',
+                sheetName: 'Dummy Business',
+                rows: history,
+                columns: [
+                  { header: 'Username', value: (r) => r.username || '' },
+                  { header: 'Name', value: (r) => r.name || '' },
+                  { header: 'UID', value: (r) => r.uid ?? '' },
+                  { header: 'Side', value: (r) => String(r.side || '').toUpperCase() },
+                  { header: 'Amount', value: (r) => formatExcelAmount(r.amount) },
+                  { header: 'Remark', value: (r) => r.remark || '' },
+                  { header: 'Given By', value: (r) => r.givenByUsername || r.givenBy || '' },
+                  { header: 'Time', value: (r) => formatExcelDate(r.time) },
+                ],
+              })
+            }
+            disabled={loading || !history.length}
+          >
+            Export Excel
+          </button>
+          <Link className="btn primary" to="/dummy-business">
+            Grant Dummy Business
+          </Link>
+        </div>
       </div>
 
       <form className="toolbar" onSubmit={onSearch}>

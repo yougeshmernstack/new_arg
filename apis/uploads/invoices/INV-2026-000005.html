@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tax Invoice INV-2026-000005</title>
+  <style>
+    :root {
+      --ink: #111827;
+      --muted: #4b5563;
+      --line: #cbd5e1;
+      --soft: #f8fafc;
+      --accent: #0f766e;
+      --accent-soft: #ecfdf5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #e5e7eb;
+      color: var(--ink);
+      font: 12.5px/1.45 "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .toolbar {
+      max-width: 900px;
+      margin: 16px auto 10px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .toolbar button {
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      border-radius: 6px;
+      padding: 9px 14px;
+      cursor: pointer;
+    }
+    .page {
+      width: 900px;
+      max-width: calc(100% - 24px);
+      margin: 0 auto 28px;
+      background: #fff;
+      border: 1px solid #94a3b8;
+    }
+    .head {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 18px;
+      padding: 22px 24px 16px;
+      border-bottom: 2px solid var(--accent);
+    }
+    .company-name {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+      color: var(--accent);
+      font-weight: 800;
+    }
+    .company-meta {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .company-meta div { margin: 2px 0; }
+    .title-box { text-align: right; }
+    .title-box .doc-type {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      padding: 5px 10px;
+      border-radius: 4px;
+    }
+    .title-box h1 {
+      margin: 10px 0 4px;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+    }
+    .title-box .muted { color: var(--muted); font-size: 12px; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--line);
+    }
+    .meta > div {
+      padding: 10px 14px;
+      border-right: 1px solid var(--line);
+      background: var(--soft);
+    }
+    .meta > div:last-child { border-right: 0; }
+    .meta span {
+      display: block;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .meta strong { font-size: 13px; word-break: break-word; }
+    .parties {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-bottom: 1px solid var(--line);
+    }
+    .party {
+      padding: 14px 16px;
+      border-right: 1px solid var(--line);
+      min-height: 0;
+    }
+    .party:last-child { border-right: 0; }
+    .party h3 {
+      margin: 0 0 8px;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .party .name { font-size: 14px; font-weight: 750; margin-bottom: 4px; }
+    .party p { margin: 2px 0; color: var(--muted); }
+    table.items {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table.items th {
+      background: #0f172a;
+      color: #fff;
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 9px 10px;
+      text-align: left;
+      font-weight: 700;
+    }
+    table.items td {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    table.items tr:nth-child(even) td { background: #fbfdff; }
+    .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .center { text-align: center; }
+    .summary {
+      display: grid;
+      grid-template-columns: 1.35fr 0.9fr;
+      border-top: 1px solid var(--line);
+    }
+    .words, .totals { padding: 14px 16px; }
+    .words { border-right: 1px solid var(--line); }
+    .words h4, .sign h4 {
+      margin: 0 0 6px;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .words p {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 11.5px;
+    }
+    .totals-table { width: 100%; border-collapse: collapse; }
+    .totals-table td {
+      padding: 7px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .totals-table tr:last-child td {
+      border-bottom: 0;
+      padding-top: 10px;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+    .sign-row {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      border-top: 1px solid var(--line);
+    }
+    .sign { padding: 14px 16px; min-height: 0; }
+    .sign.right { border-left: 1px solid var(--line); text-align: right; }
+    .sign .space { height: 42px; }
+    .sign .who { font-weight: 700; }
+    .footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--line);
+      background: var(--soft);
+      color: var(--muted);
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .badge-paid {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+    }
+    @page {
+      size: A4;
+      margin: 8mm;
+    }
+    @media print {
+      html, body {
+        width: 100%;
+        background: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .toolbar { display: none !important; }
+      .page {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        border: 0 !important;
+        box-shadow: none !important;
+      }
+      .head {
+        padding: 10px 12px 8px;
+        gap: 10px;
+      }
+      .company-name { font-size: 18px; }
+      .company-meta { font-size: 10px; margin-top: 4px; }
+      .title-box h1 { margin: 6px 0 2px; font-size: 16px; }
+      .meta > div { padding: 6px 8px; }
+      .meta strong { font-size: 11px; }
+      .party { padding: 8px 10px; min-height: 0 !important; }
+      .party .name { font-size: 12px; }
+      .party p { font-size: 10.5px; }
+      table.items th { padding: 6px 7px; font-size: 9px; }
+      table.items td { padding: 6px 7px; font-size: 11px; }
+      .words, .totals, .sign { padding: 8px 10px; }
+      .words p { font-size: 11px; }
+      .note { margin-top: 6px; font-size: 10px; }
+      .totals-table td { padding: 4px 0; font-size: 11px; }
+      .totals-table tr:last-child td { font-size: 13px; padding-top: 6px; }
+      .sign { min-height: 0 !important; }
+      .sign .space { height: 28px; }
+      .footer { padding: 6px 10px; font-size: 10px; }
+      .head, .meta, .parties, .items, .summary, .sign-row, .footer {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      tr { break-inside: avoid; page-break-inside: avoid; }
+    }
+    @media (max-width: 760px) {
+      .head, .parties, .summary, .sign-row, .meta { grid-template-columns: 1fr; }
+      .meta > div, .party, .words, .sign.right { border-right: 0; border-left: 0; border-bottom: 1px solid var(--line); }
+      .title-box { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button type="button" onclick="window.print()">Print / Save PDF</button>
+  </div>
+
+  <div class="page">
+    <header class="head">
+      <div>
+        <h1 class="company-name">Arogya Greenlife</h1>
+        <div class="company-meta">
+          
+          <div>Phone: +91 9317350031</div>
+          <div>Email: info@arogyagreenlife.com</div>
+          <div>Web: https://arogyagreenlife.com/</div>
+          
+          
+        </div>
+      </div>
+      <div class="title-box">
+        <div class="doc-type">TAX INVOICE</div>
+        <h1>INV-2026-000005</h1>
+        <div class="muted">Distributor invoice</div>
+        <div class="muted">Date: 31 Jul 2026</div>
+      </div>
+    </header>
+
+    <section class="meta">
+      <div>
+        <span>Order No.</span>
+        <strong>ORD-2026-000005</strong>
+      </div>
+      <div>
+        <span>Payment</span>
+        <strong>
+          Paid
+          <span class="badge-paid">RECEIVED</span>
+        </strong>
+      </div>
+      <div>
+        <span>Mode</span>
+        <strong>Bank / UPI Transfer</strong>
+      </div>
+      <div>
+        <span>UTR / Ref.</span>
+        <strong>sDc</strong>
+      </div>
+    </section>
+
+    <section class="parties">
+      <div class="party">
+        <h3>Bill To</h3>
+        <div class="name">d</div>
+        <p>Mobile: 1</p>
+        <p>Email: demo@gmail.com</p>
+        <p>SDc, sdc, sSdc, dscSDc, SDdc, India</p>
+        
+      </div>
+      <div class="party">
+        <h3>Ship To</h3>
+        <div class="name">d</div>
+        <p>Mobile: 1</p>
+        <p>SDc, sdc, sSdc, dscSDc, SDdc, India</p>
+        <p><strong>Package:</strong> sea buckthorn1</p>
+      </div>
+    </section>
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th style="width:42px">#</th>
+          <th>Description</th>
+          <th style="width:100px">SKU</th>
+          <th class="center" style="width:70px">Qty</th>
+          <th class="num" style="width:110px">Rate (₹)</th>
+          <th class="num" style="width:120px">Amount (₹)</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        
+          <tr>
+            <td class="center">1</td>
+            <td>
+              <strong>sea buckthorn</strong>
+              
+            </td>
+            <td>1</td>
+            <td class="center">1</td>
+            <td class="num">2,500.00</td>
+            <td class="num">2,500.00</td>
+          </tr>
+        
+      </tbody>
+    </table>
+
+    <section class="summary">
+      <div class="words">
+        <h4>Amount in words</h4>
+        <p>Two Thousand Five Hundred Rupees Only</p>
+        <div class="note">
+          This is a computer-generated tax invoice for a distributor purchase.
+           Business volume on this invoice: <strong>1,250.00 BV</strong>.
+        </div>
+      </div>
+      <div class="totals">
+        <table class="totals-table">
+          <tr>
+            <td>Subtotal</td>
+            <td class="num">₹2,500.00</td>
+          </tr>
+          <tr>
+            <td>Discount</td>
+            <td class="num">₹0.00</td>
+          </tr>
+          <tr>
+            <td>Tax / GST</td>
+            <td class="num">₹0.00</td>
+          </tr>
+          <tr>
+            <td>Grand Total</td>
+            <td class="num">₹2,500.00</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <section class="sign-row">
+      <div class="sign">
+        <h4>Declaration</h4>
+        <p class="note" style="margin:0">
+          We declare that this invoice shows the actual price of the goods/services described
+          and that all particulars are true and correct.
+        </p>
+      </div>
+      <div class="sign right">
+        <h4>For Arogya Greenlife</h4>
+        <div class="space"></div>
+        <div class="who">Authorized Signatory</div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Thank you for your business with Arogya Greenlife.</span>
+      <span>Generated 01 Aug 2026, 05:01 pm</span>
+    </footer>
+  </div>
+</body>
+</html>

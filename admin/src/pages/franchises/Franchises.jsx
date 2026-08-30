@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { wellnessApi } from '../../api';
+import { exportToExcel } from '../../utils/exportExcel';
 
 const FRANCHISE_PANEL_URL =
   process.env.REACT_APP_FRANCHISE_PANEL_URL || 'http://localhost:3002';
@@ -86,9 +87,34 @@ export default function Franchises() {
           <h2>Franchises</h2>
           <p className="page-sub">Manage franchise partners, status, and panel access</p>
         </div>
-        <Link className="btn primary" to="/franchises/create">
-          Create Franchise
-        </Link>
+        <div className="toolbar" style={{ margin: 0, padding: 0, border: 'none', background: 'transparent' }}>
+          <button
+            type="button"
+            className="btn"
+            disabled={loading || !list.length}
+            onClick={() =>
+              exportToExcel({
+                filename: 'franchises',
+                sheetName: 'Franchises',
+                rows: list,
+                columns: [
+                  { header: 'ID', value: (r) => r.franchiseId ?? '' },
+                  { header: 'Business', value: (r) => r.business_name || '' },
+                  { header: 'Owner', value: (r) => r.owner_name || '' },
+                  { header: 'Email', value: (r) => r.email || '' },
+                  { header: 'Mobile', value: (r) => r.mobile || '' },
+                  { header: 'UID', value: (r) => r.uid ?? '' },
+                  { header: 'Status', value: (r) => r.status || '' },
+                ],
+              })
+            }
+          >
+            Export Excel
+          </button>
+          <Link className="btn primary" to="/franchises/create">
+            Create Franchise
+          </Link>
+        </div>
       </div>
 
       <form className="toolbar" onSubmit={onSearch}>

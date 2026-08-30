@@ -133,6 +133,10 @@
   min-width: 0;
 }
 
+.nav-item-main .nav-badge {
+  margin-left: 0.05rem;
+}
+
 .nav-icon {
   width: 18px;
   height: 18px;
@@ -257,6 +261,29 @@
   font-size: 0.82rem;
   color: #7c8ca0;
   border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.nav-sub-label {
+  min-width: 0;
+}
+
+.nav-badge {
+  flex-shrink: 0;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.25rem;
+  text-align: center;
+  box-shadow: 0 0 0 2px rgba(11, 18, 32, 0.35);
 }
 
 .nav-link.sub:hover,

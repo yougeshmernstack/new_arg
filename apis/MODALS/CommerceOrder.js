@@ -44,6 +44,21 @@ const shippingSchema = new mongoose.Schema({
     delivered_date: { type: Date, default: null }
 }, { _id: false });
 
+const paymentSchema = new mongoose.Schema({
+    mode: { type: String, enum: ['manual'], default: 'manual' },
+    utr: { type: String, default: '' },
+    proofUrl: { type: String, default: '' },
+    submitted_at: { type: Date, default: null },
+    status: {
+        type: String,
+        enum: ['none', 'submitted', 'verified', 'rejected'],
+        default: 'none'
+    },
+    verified_by: { type: Number, default: null },
+    verified_at: { type: Date, default: null },
+    remark: { type: String, default: '' }
+}, { _id: false });
+
 const commerceOrderSchema = new mongoose.Schema({
     orderId: { type: Number, unique: true },
     order_number: { type: String, unique: true },
@@ -82,6 +97,19 @@ const commerceOrderSchema = new mongoose.Schema({
         enum: ['pending', 'received', 'failed', 'refunded'],
         default: 'pending'
     },
+    payment: {
+        type: paymentSchema,
+        default: () => ({
+            mode: 'manual',
+            utr: '',
+            proofUrl: '',
+            submitted_at: null,
+            status: 'none',
+            verified_by: null,
+            verified_at: null,
+            remark: ''
+        })
+    },
     order_status: {
         type: String,
         enum: ORDER_STATUSES,
@@ -119,6 +147,10 @@ commerceOrderSchema.index({ order_type: 1 });
 commerceOrderSchema.index({ created_date: -1 });
 commerceOrderSchema.index({ invoice_number: 1 }, { unique: true, sparse: true });
 commerceOrderSchema.index({ idempotency_key: 1 }, { unique: true, sparse: true });
+commerceOrderSchema.index(
+    { 'payment.utr': 1 },
+    { unique: true, sparse: true, partialFilterExpression: { 'payment.utr': { $type: 'string', $gt: '' } } }
+);
 
 commerceOrderSchema.pre('save', async function (next) {
     try {

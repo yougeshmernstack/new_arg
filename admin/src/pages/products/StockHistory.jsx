@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { commerceApi } from '../../api';
+import { exportToExcel, formatExcelDate } from '../../utils/exportExcel';
 
 export default function StockHistory() {
   const [params] = useSearchParams();
@@ -35,6 +36,35 @@ export default function StockHistory() {
     <div className="page">
       <div className="page-head">
         <h2>Stock History</h2>
+        <button
+          type="button"
+          className="btn"
+          disabled={loading || !list.length}
+          onClick={() =>
+            exportToExcel({
+              filename: 'stock_history',
+              sheetName: 'Stock History',
+              rows: list,
+              columns: [
+                { header: 'ID', value: (r) => r.historyId ?? '' },
+                { header: 'Product ID', value: (r) => r.productId ?? '' },
+                { header: 'SKU', value: (r) => r.sku || '' },
+                { header: 'Action', value: (r) => r.action || '' },
+                { header: 'Qty', value: (r) => r.quantity ?? '' },
+                { header: 'Previous', value: (r) => r.previous_available ?? '' },
+                { header: 'New', value: (r) => r.new_available ?? '' },
+                {
+                  header: 'Reference',
+                  value: (r) => `${r.reference_type || ''} ${r.reference_id || ''}`.trim(),
+                },
+                { header: 'Remark', value: (r) => r.remark || '' },
+                { header: 'Date', value: (r) => formatExcelDate(r.created_date) },
+              ],
+            })
+          }
+        >
+          Export Excel
+        </button>
       </div>
       <form
         className="toolbar"

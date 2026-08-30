@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { payoutReportApi } from '../../api';
+import { exportToExcel, formatExcelAmount } from '../../utils/exportExcel';
 
 function formatAmount(value) {
   return Number(value || 0).toLocaleString('en-IN', {
@@ -35,6 +36,29 @@ export default function PayoutReport() {
     load();
   }, []);
 
+  const handleExport = () => {
+    const rows = [
+      {
+        name: 'TOTAL (All types)',
+        slug: '',
+        totalAmount: total.totalAmount,
+        todayAmount: total.todayAmount,
+      },
+      ...items,
+    ];
+    exportToExcel({
+      filename: 'payout_report_summary',
+      sheetName: 'Payout Summary',
+      rows,
+      columns: [
+        { header: 'Income Type', value: (r) => r.name || r.slug || '' },
+        { header: 'Slug', value: (r) => r.slug || '' },
+        { header: 'Total Amount', value: (r) => formatExcelAmount(r.totalAmount) },
+        { header: 'Today Amount', value: (r) => formatExcelAmount(r.todayAmount) },
+      ],
+    });
+  };
+
   return (
     <div className="page">
       <div className="page-head">
@@ -44,9 +68,14 @@ export default function PayoutReport() {
             Income by type — totals and today. Select a card for transaction history.
           </p>
         </div>
-        <button type="button" className="btn" onClick={load} disabled={loading}>
-          Refresh
-        </button>
+        <div className="toolbar" style={{ margin: 0, padding: 0, border: 'none', background: 'transparent' }}>
+          <button type="button" className="btn" onClick={handleExport} disabled={loading || !items.length}>
+            Export Excel
+          </button>
+          <button type="button" className="btn" onClick={load} disabled={loading}>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error ? <div className="alert error">{error}</div> : null}

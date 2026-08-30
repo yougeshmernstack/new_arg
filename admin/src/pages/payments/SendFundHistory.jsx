@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { paymentsApi } from '../../api';
+import { exportToExcel, formatExcelAmount, formatExcelDate } from '../../utils/exportExcel';
 
 function formatTime(value) {
   if (!value) return '—';
@@ -62,9 +63,35 @@ export default function SendFundHistory() {
           <h2>Send Fund History</h2>
           <p>All admin fund credits to distributor wallets</p>
         </div>
-        <Link className="btn primary" to="/send-fund">
-          Send Fund
-        </Link>
+        <div className="toolbar" style={{ margin: 0, padding: 0, border: 'none', background: 'transparent' }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              exportToExcel({
+                filename: 'send_fund_history',
+                sheetName: 'Send Fund',
+                rows: history,
+                columns: [
+                  { header: 'Tx ID', value: (r) => r.tx_Id ?? '' },
+                  { header: 'Username', value: (r) => r.username || '' },
+                  { header: 'Name', value: (r) => r.name || '' },
+                  { header: 'UID', value: (r) => r.uid ?? '' },
+                  { header: 'Amount', value: (r) => formatExcelAmount(r.amount) },
+                  { header: 'Remark', value: (r) => r.remark || '' },
+                  { header: 'Sent By', value: (r) => r.sentByUsername || r.sentBy || '' },
+                  { header: 'Time', value: (r) => formatExcelDate(r.time) },
+                ],
+              })
+            }
+            disabled={loading || !history.length}
+          >
+            Export Excel
+          </button>
+          <Link className="btn primary" to="/send-fund">
+            Send Fund
+          </Link>
+        </div>
       </div>
 
       <form className="toolbar" onSubmit={onSearch}>

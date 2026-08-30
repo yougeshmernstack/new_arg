@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { storeApi } from '../../api';
+import { API_BASE_URL } from '../../utils/constants';
+
+function mediaUrl(path) {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+}
 
 function PackageIcon() {
   return (
@@ -78,6 +85,7 @@ export default function Packages() {
             const discounted = Number(pkg.discounted_amount ?? pkg.price ?? 0);
             const items = pkg.items || [];
             const benefits = pkg.benefits || [];
+            const previewItems = items.slice(0, 3);
             const hasDiscount = amount > discounted;
             const savePct = hasDiscount ? Math.round(((amount - discounted) / amount) * 100) : 0;
 
@@ -87,6 +95,13 @@ export default function Packages() {
                 className={`package-card${!pkg.in_stock ? ' is-oos' : ''}`}
               >
                 <div className="package-card-accent" aria-hidden="true" />
+                {pkg.images?.[0] ? (
+                  <img
+                    src={mediaUrl(pkg.images?.[0])}
+                    alt={`${pkg.name} cover`}
+                    className="package-card-media"
+                  />
+                ) : null}
                 <div className="package-card-top">
                   <div className="package-card-title-row">
                     <h3>{pkg.name}</h3>
@@ -96,7 +111,7 @@ export default function Packages() {
                       <span className="package-type-badge">Activation</span>
                     )}
                   </div>
-                  {pkg.description ? <p className="package-desc">{pkg.description}</p> : null}
+                  {pkg.description ? <p className="package-desc package-desc-clamp">{pkg.description}</p> : null}
                 </div>
 
                 <div className="package-price-block">
@@ -120,7 +135,7 @@ export default function Packages() {
                   <div className="package-section">
                     <h4>Includes</h4>
                     <ul className="package-items">
-                      {items.map((item) => (
+                      {previewItems.map((item) => (
                         <li key={item.productId}>
                           <span className="package-item-name">
                             {item.product?.product_name || `Product #${item.productId}`}
@@ -132,6 +147,9 @@ export default function Packages() {
                         </li>
                       ))}
                     </ul>
+                    {items.length > previewItems.length ? (
+                      <p className="package-more-note">+{items.length - previewItems.length} more items</p>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -139,7 +157,7 @@ export default function Packages() {
                   <div className="package-section">
                     <h4>Benefits</h4>
                     <ul className="package-benefits">
-                      {benefits.slice(0, 5).map((b) => (
+                      {benefits.slice(0, 3).map((b) => (
                         <li key={b}>
                           <CheckIcon />
                           <span>{b}</span>
@@ -149,7 +167,10 @@ export default function Packages() {
                   </div>
                 ) : null}
 
-                <div className="package-card-footer">
+                <div className="package-card-footer package-card-actions">
+                  <Link className="btn ghost package-cta" to={`/packages/${pkg.packageId}`}>
+                    View package
+                  </Link>
                   <Link
                     className={`btn primary package-cta${!pkg.in_stock ? ' disabled' : ''}`}
                     to={`/packages/${pkg.packageId}/checkout`}

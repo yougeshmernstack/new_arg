@@ -17,6 +17,8 @@ export type Product = {
   rating: number;
   reviews: number;
   image: string;
+  images?: string[];
+  descriptionImages?: string[];
   badge?: string;
   status?: "available" | "upcoming";
   packSize: string;
@@ -33,6 +35,8 @@ export type Package = {
   price: number;
   compareAtPrice: number;
   image: string;
+  images?: string[];
+  descriptionImages?: string[];
   badge: string;
   includes: string[];
   benefits: string[];

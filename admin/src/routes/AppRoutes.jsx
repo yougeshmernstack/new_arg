@@ -26,6 +26,7 @@ import SendFundHistory from '../pages/payments/SendFundHistory';
 import GrantDummyBusiness from '../pages/team/GrantDummyBusiness';
 import DummyBusinessHistory from '../pages/team/DummyBusinessHistory';
 import CompanyBrand from '../pages/website/CompanyBrand';
+import HeroBackground from '../pages/website/HeroBackground';
 import AboutFounders from '../pages/website/AboutFounders';
 import LegalDocuments from '../pages/website/LegalDocuments';
 import DashboardBanners from '../pages/website/DashboardBanners';
@@ -75,6 +76,7 @@ export default function AppRoutes() {
             <Route path="royality-achievements" element={<RankAchievementList type="royality" />} />
             <Route path="traveling-achievements" element={<RankAchievementList type="traveling" />} />
             <Route path="website/company" element={<CompanyBrand />} />
+            <Route path="website/hero" element={<HeroBackground />} />
             <Route path="website/about" element={<AboutFounders />} />
             <Route path="website/legal" element={<LegalDocuments />} />
             <Route path="website/banners" element={<DashboardBanners />} />

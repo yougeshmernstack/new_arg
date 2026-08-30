@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { wellnessApi } from '../../api';
+import { exportToExcel, formatExcelDate } from '../../utils/exportExcel';
 
 export default function AuditLogs() {
   const [list, setList] = useState([]);
@@ -25,7 +26,33 @@ export default function AuditLogs() {
 
   return (
     <div className="page">
-      <h2>Audit Logs</h2>
+      <div className="page-head">
+        <h2>Audit Logs</h2>
+        <button
+          type="button"
+          className="btn"
+          disabled={loading || !list.length}
+          onClick={() =>
+            exportToExcel({
+              filename: 'audit_logs',
+              sheetName: 'Audit Logs',
+              rows: list,
+              columns: [
+                { header: 'Action', value: (r) => r.action || '' },
+                { header: 'Actor', value: (r) => r.actor_uid ?? '' },
+                { header: 'Target', value: (r) => r.target_uid || r.target_id || '' },
+                { header: 'Role', value: (r) => r.target_role || r.actor_role || '' },
+                {
+                  header: 'Date',
+                  value: (r) => formatExcelDate(r.createdAt || r.created_date),
+                },
+              ],
+            })
+          }
+        >
+          Export Excel
+        </button>
+      </div>
       {error ? <div className="alert error">{error}</div> : null}
       {loading ? (
         <p>Loading...</p>

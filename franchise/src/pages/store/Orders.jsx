@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { storeApi } from '../../api';
+import { canDownloadInvoice, downloadOrderInvoice } from '../../utils/downloadInvoice';
 
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
@@ -51,6 +52,7 @@ export default function Orders() {
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [downloadingId, setDownloadingId] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -88,6 +90,19 @@ export default function Orders() {
       spend: totalSpend,
     };
   }, [list]);
+
+  const handleDownloadInvoice = async (item) => {
+    if (!canDownloadInvoice(item)) return;
+    setDownloadingId(item.orderId);
+    setError('');
+    try {
+      await downloadOrderInvoice(item.orderId, item.invoice_number || `order-${item.orderId}`);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to download invoice');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   return (
     <div className="page purchase-page">
@@ -200,6 +215,16 @@ export default function Orders() {
                   <Link className="btn primary" to={`/orders/${item.orderId}`}>
                     View details
                   </Link>
+                  {canDownloadInvoice(item) ? (
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      disabled={downloadingId === item.orderId}
+                      onClick={() => handleDownloadInvoice(item)}
+                    >
+                      {downloadingId === item.orderId ? '…' : 'Download invoice'}
+                    </button>
+                  ) : null}
                 </div>
               </article>
             );

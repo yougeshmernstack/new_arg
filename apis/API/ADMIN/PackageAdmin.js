@@ -30,6 +30,11 @@ function parseBenefits(benefits) {
     return [];
 }
 
+function parseImageList(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map((u) => String(u || '').trim()).filter(Boolean);
+}
+
 async function assertProductsExist(items) {
     if (!items.length) {
         const err = new Error('At least one product is required in the package.');
@@ -60,7 +65,9 @@ class PACKAGE_ADMIN {
                 bv,
                 pv,
                 items,
-                status
+                status,
+                images,
+                description_images
             } = req.body;
 
             if (!name || String(name).trim() === '') {
@@ -76,6 +83,8 @@ class PACKAGE_ADMIN {
             const pkg = new Package({
                 name: String(name).trim(),
                 description: description || '',
+                images: parseImageList(images),
+                description_images: parseImageList(description_images),
                 benefits: parseBenefits(benefits),
                 amount: amountNum,
                 discounted_amount: discountedNum,
@@ -129,7 +138,9 @@ class PACKAGE_ADMIN {
                 bv,
                 pv,
                 items,
-                status
+                status,
+                images,
+                description_images
             } = req.body;
 
             if (name !== undefined) {
@@ -139,6 +150,8 @@ class PACKAGE_ADMIN {
                 pkg.name = String(name).trim();
             }
             if (description !== undefined) pkg.description = description || '';
+            if (images !== undefined) pkg.images = parseImageList(images);
+            if (description_images !== undefined) pkg.description_images = parseImageList(description_images);
             if (benefits !== undefined) pkg.benefits = parseBenefits(benefits);
             if (amount !== undefined) pkg.amount = Math.max(0, Number(amount) || 0);
             if (discounted_amount !== undefined) {

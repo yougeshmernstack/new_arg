@@ -13,7 +13,7 @@ class PRODUCT_ADMIN {
         try {
             const {
                 product_name, sku, categoryId, brandId, packageId,
-                images, videos, description, ingredients, benefits,
+                images, videos, description_images, description, ingredients, benefits,
                 nutrition_facts, directions, storage, manufacturing_details,
                 batch_number, expiry_date, weight, gst, mrp,
                 distributor_price, franchise_price, bv, stock, status, is_hidden
@@ -37,6 +37,7 @@ class PRODUCT_ADMIN {
                 packageId: Number(packageId),
                 images: Array.isArray(images) ? images : [],
                 videos: Array.isArray(videos) ? videos : [],
+                description_images: Array.isArray(description_images) ? description_images : [],
                 description: description || '',
                 ingredients: ingredients || '',
                 benefits: Array.isArray(benefits) ? benefits : [],
@@ -125,6 +126,11 @@ class PRODUCT_ADMIN {
             if (req.body.packageId !== undefined) product.packageId = Number(req.body.packageId);
             if (req.body.images !== undefined) product.images = Array.isArray(req.body.images) ? req.body.images : product.images;
             if (req.body.videos !== undefined) product.videos = Array.isArray(req.body.videos) ? req.body.videos : product.videos;
+            if (req.body.description_images !== undefined) {
+                product.description_images = Array.isArray(req.body.description_images)
+                    ? req.body.description_images
+                    : product.description_images;
+            }
             if (req.body.benefits !== undefined) product.benefits = Array.isArray(req.body.benefits) ? req.body.benefits : product.benefits;
             if (req.body.expiry_date !== undefined) {
                 product.expiry_date = req.body.expiry_date ? new Date(req.body.expiry_date) : null;

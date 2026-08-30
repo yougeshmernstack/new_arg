@@ -13,8 +13,16 @@ const { REQUEST_SUCCESS } = require('../../utils/successMessages');
 class DistributorFund {
   async getPaymentMethods(req, res) {
     try {
-      const options = await PaymentOption.findOne();
-      if (!options || !options.manual?.status) {
+      let options = await PaymentOption.findOne();
+      if (!options) {
+        options = await new PaymentOption({
+          manual: { status: 1, bank: [], upi: [] },
+          api: { status: 0, providers: [] },
+          web3: { status: 0, chains: [] }
+        }).save();
+      }
+
+      if (!options.manual?.status) {
         return res.status(200).json({
           success: true,
           data: { bank: [], upi: [] }
