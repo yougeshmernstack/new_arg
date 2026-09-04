@@ -38,6 +38,9 @@ class MailerService {
         const port = Number(process.env.SMTP_PORT) || 465;
         if (!this._transporter || this._smtpKey !== `${process.env.SMTP_HOST}:${port}:${process.env.SMTP_USER}`) {
             this._smtpKey = `${process.env.SMTP_HOST}:${port}:${process.env.SMTP_USER}`;
+            // AVG/other mail shields often MITM SMTP and break Node cert verify.
+            const rejectUnauthorized =
+                String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || 'true').toLowerCase() !== 'false';
             this._transporter = nodemailer.createTransport({
                 host: process.env.SMTP_HOST,
                 port,
@@ -46,6 +49,7 @@ class MailerService {
                     user: process.env.SMTP_USER,
                     pass: process.env.SMTP_PASS,
                 },
+                tls: { rejectUnauthorized },
                 greetingTimeout: 30000,
             });
         }

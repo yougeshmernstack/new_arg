@@ -1383,6 +1383,39 @@ tbody tr:hover {
   margin: 0 0 0.75rem;
 }
 
+.binary-tree-search {
+  display: flex;
+  gap: 0.65rem;
+  align-items: stretch;
+  flex-wrap: wrap;
+  margin: 0 0 0.85rem;
+}
+
+.binary-tree-search-field {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.binary-tree-search-field input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.7rem 0.95rem;
+  background: #fff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.binary-tree-search-field input:focus {
+  outline: none;
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(45, 106, 62, 0.14);
+}
+
+.binary-tree-search .btn.primary {
+  flex-shrink: 0;
+  padding-inline: 1.25rem;
+}
+
 .binary-tree-legend {
   display: flex;
   align-items: center;

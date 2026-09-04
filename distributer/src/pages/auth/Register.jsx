@@ -129,11 +129,11 @@ export default function Register() {
               );
             })}
             <fieldset className="register-field field-placement">
-              <legend>Binary placement</legend>
+              <legend>Matching placement</legend>
               <p className="placement-hint">
                 {placementLocked
                   ? 'Placement is set from your referral link.'
-                  : 'Choose Left or Right. Placement under your sponsor follows the binary spillover rule automatically.'}
+                  : 'Choose Left or Right. Placement under your sponsor follows the matching spillover rule automatically.'}
               </p>
               <div className="placement-options">
                 {SIDE_OPTIONS.map((opt) => (

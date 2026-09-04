@@ -606,9 +606,36 @@ class DISTRIBUTOR_TEAM {
             const myUid = Number(req.user.uid);
             // depth=2 → root + 2 child levels (3 visual levels)
             const depth = Math.min(Math.max(parseInt(req.query.depth, 10) || 2, 1), 10);
-            const requestedRoot = req.query.root != null && req.query.root !== ''
-                ? Number(req.query.root)
-                : myUid;
+            const rawRoot = req.query.root ?? req.query.username ?? req.query.search;
+            let requestedRoot = myUid;
+            let resolvedUsername = null;
+
+            if (rawRoot != null && String(rawRoot).trim() !== '') {
+                const raw = String(rawRoot).trim();
+                if (/^\d+$/.test(raw)) {
+                    requestedRoot = Number(raw);
+                    const byUid = await Distributor.findOne({ uid: requestedRoot }).select('uid username');
+                    if (!byUid) {
+                        return res.status(404).json({
+                            status: 404,
+                            message: 'ID not found.'
+                        });
+                    }
+                    resolvedUsername = byUid.username;
+                } else {
+                    const byUsername = await Distributor.findOne({
+                        username: { $regex: `^${raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' }
+                    }).select('uid username');
+                    if (!byUsername) {
+                        return res.status(404).json({
+                            status: 404,
+                            message: 'ID not found.'
+                        });
+                    }
+                    requestedRoot = Number(byUsername.uid);
+                    resolvedUsername = byUsername.username;
+                }
+            }
 
             if (!Number.isFinite(requestedRoot)) {
                 return res.status(400).json({ status: 400, message: 'Invalid root uid.' });
@@ -618,7 +645,7 @@ class DISTRIBUTOR_TEAM {
             if (!allowed) {
                 return res.status(403).json({
                     status: 403,
-                    message: 'You can only open trees within your binary downline.'
+                    message: 'This ID is outside your matching team. You can only view trees within your downline.'
                 });
             }
 
@@ -626,8 +653,13 @@ class DISTRIBUTOR_TEAM {
 
             return res.status(200).json({
                 status: 200,
-                message: 'Binary tree fetched.',
-                data: tree
+                message: 'Matching tree fetched.',
+                data: tree,
+                meta: {
+                    self: requestedRoot === myUid,
+                    rootUid: requestedRoot,
+                    rootUsername: resolvedUsername || tree?.username || null
+                }
             });
         } catch (error) {
             errorLogger(error);

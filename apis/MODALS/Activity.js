@@ -50,7 +50,7 @@ const act = [
     {
         name: 'matching_income',
         view: 'Matching income',
-        description: 'Binary matching income (2:1)',
+        description: 'Matching income (2:1)',
         type: 'income',
         debit_credit: 'credit',
         use_wallet: [
@@ -324,7 +324,7 @@ const act = [
     },
     {
         name: 'upline_matching_income',
-        view: 'Upline Matching Income',
+        view: 'Mentor Income',
         description: 'Share of sponsor matching income distributed equally to active directs',
         type: 'income',
         debit_credit: 'credit',
@@ -399,11 +399,11 @@ async function saveActivity() {
                 allowed_roles: ['distributor'],
                 act_id: 16
             });
-            // Binary matching income (1:1 closing)
+            // Matching income (1:1 closing)
             await ensureActivity({
                 name: 'matching_income',
                 view: 'Matching income',
-                description: 'Binary matching income (1:1 × 1250)',
+                description: 'Matching income (1:1 × 1250)',
                 type: 'income',
                 debit_credit: 'credit',
                 use_wallet: [{ wallet_name: 'main_wallet', percentage: 100 }],
@@ -423,10 +423,10 @@ async function saveActivity() {
                 allowed_roles: ['distributor', 'user', 'admin'],
                 act_id: 17
             });
-            // Upline matching income (share of sponsor matching → active directs)
+            // Mentor income (share of sponsor matching → active directs)
             await ensureActivity({
                 name: 'upline_matching_income',
-                view: 'Upline Matching Income',
+                view: 'Mentor Income',
                 description: 'Share of sponsor matching income distributed equally to active directs',
                 type: 'income',
                 debit_credit: 'credit',

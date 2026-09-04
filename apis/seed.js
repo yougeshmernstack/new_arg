@@ -126,7 +126,7 @@ async function seedWalletsCatalog() {
         { id: 8, name: 'Direct Income', wallet_type: 'income', status: 1, slug: 'direct_income', count_in: 'main_wallet' },
         { id: 9, name: 'Matching Income', wallet_type: 'income', status: 1, slug: 'matching_income', count_in: 'main_wallet' },
         { id: 10, name: 'Repurchase Matching Income', wallet_type: 'income', status: 1, slug: 'repurchase_matching_income', count_in: 'main_wallet' },
-        { id: 11, name: 'Upline Matching Income', wallet_type: 'income', status: 1, slug: 'upline_matching_income', count_in: 'main_wallet' }
+        { id: 11, name: 'Mentor Income', wallet_type: 'income', status: 1, slug: 'upline_matching_income', count_in: 'main_wallet' }
     ];
     await Wallets.deleteMany({});
     await Wallets.insertMany(wallets);

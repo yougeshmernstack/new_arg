@@ -64,7 +64,7 @@ export default function GrantDummyBusiness() {
         <div>
           <h2>Dummy Business</h2>
           <p>
-            Grant left/right dummy BV to a distributor. Visible only on that user’s Binary BV panel — not
+            Grant left/right dummy BV to a distributor. Visible only on that user’s Matching BV panel — not
             shared with upline or downline.
           </p>
         </div>

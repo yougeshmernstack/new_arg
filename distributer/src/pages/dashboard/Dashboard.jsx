@@ -321,7 +321,7 @@ function ReferralCopyRow({ label, side, link, username }) {
           <i aria-hidden="true">{side === 'left' ? 'L' : 'R'}</i>
           <div>
             <strong>{label}</strong>
-            <small>Binary {side} placement</small>
+            <small>Matching {side} placement</small>
           </div>
         </div>
         <button
@@ -363,7 +363,7 @@ function ReferralLinkCard({ username }) {
       <div className="dash-panel-head dash-referral-head">
         <div>
           <h3>Your Referral Links</h3>
-          <p>Share Left or Right — new distributors join on that binary side under you</p>
+          <p>Share Left or Right — new distributors join on that matching side under you</p>
         </div>
         <span className="dash-chip dash-referral-chip">
           <MetricIcon type="customers" />
@@ -636,12 +636,12 @@ export default function Dashboard() {
           <div className="dash-panel dash-bv-panel">
             <div className="dash-panel-head">
               <div>
-                <h3>Binary BV</h3>
+                <h3>Matching BV</h3>
                 <p>Package purchase volume — left, right, match and dummy</p>
               </div>
               <Link to="/team/binary" className="dash-chip dash-chip-link dash-bv-link">
                 <MetricIcon type="tree" />
-                View binary tree
+                View matching tree
               </Link>
             </div>
 
@@ -649,7 +649,7 @@ export default function Dashboard() {
               <div className="dash-bv-hero-copy">
                 <span>Match BV</span>
                 <strong>{formatInr(matchBv, 2)}</strong>
-                <small>Updates after binary matching closing</small>
+                <small>Updates after matching closing</small>
               </div>
               <div className="dash-bv-hero-side">
                 <div className="dash-bv-hero-stats">

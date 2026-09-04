@@ -199,6 +199,9 @@ export default function BinaryTeam() {
   const [error, setError] = useState('');
   const [trail, setTrail] = useState([]); // [{ uid, username }]
   const [hoverTip, setHoverTip] = useState(null);
+  const [selfUid, setSelfUid] = useState(null);
+  const [searchId, setSearchId] = useState('');
+  const [searching, setSearching] = useState(false);
   const scrollRef = useRef(null);
   const rootNodeRef = useRef(null);
 
@@ -223,10 +226,10 @@ export default function BinaryTeam() {
       if (rootUid != null) params.root = rootUid;
       const treeRes = await distributorApi.getBinaryTree(params);
       setTree(treeRes.data?.data || null);
-      return true;
+      return { ok: true, meta: treeRes.data?.meta || null, data: treeRes.data?.data || null };
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load binary tree');
-      return false;
+      setError(err.response?.data?.message || 'Failed to load matching tree');
+      return { ok: false };
     } finally {
       setTreeLoading(false);
     }
@@ -240,10 +243,12 @@ export default function BinaryTeam() {
       try {
         const treeRes = await distributorApi.getBinaryTree({ depth: TREE_DEPTH });
         if (!active) return;
-        setTree(treeRes.data?.data || null);
+        const data = treeRes.data?.data || null;
+        setTree(data);
+        if (data?.uid != null) setSelfUid(Number(data.uid));
         setTrail([]);
       } catch (err) {
-        if (active) setError(err.response?.data?.message || 'Failed to load binary team');
+        if (active) setError(err.response?.data?.message || 'Failed to load matching team');
       } finally {
         if (active) setLoading(false);
       }
@@ -281,42 +286,85 @@ export default function BinaryTeam() {
 
   const openNode = async (node) => {
     if (!node?.uid) return;
-    const ok = await loadTree(node.uid);
-    if (ok) setTrail((prev) => [...prev, { uid: node.uid, username: node.username }]);
+    const result = await loadTree(node.uid);
+    if (result.ok) setTrail((prev) => [...prev, { uid: node.uid, username: node.username }]);
   };
 
   const goToTrailIndex = async (index) => {
     if (index < 0) {
-      const ok = await loadTree(undefined);
-      if (ok) setTrail([]);
+      const result = await loadTree(undefined);
+      if (result.ok) setTrail([]);
       return;
     }
     const target = trail[index];
     if (!target) return;
-    const ok = await loadTree(target.uid);
-    if (ok) setTrail((prev) => prev.slice(0, index + 1));
+    const result = await loadTree(target.uid);
+    if (result.ok) setTrail((prev) => prev.slice(0, index + 1));
+  };
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    const query = String(searchId || '').trim();
+    if (!query) {
+      setError('Enter a team ID to search.');
+      return;
+    }
+    setSearching(true);
+    setError('');
+    setHoverTip(null);
+    try {
+      const treeRes = await distributorApi.getBinaryTree({ depth: TREE_DEPTH, username: query });
+      const data = treeRes.data?.data || null;
+      const meta = treeRes.data?.meta || {};
+      setTree(data);
+      if (meta.self || (selfUid != null && data?.uid != null && Number(data.uid) === selfUid)) {
+        setTrail([]);
+      } else if (data?.uid != null) {
+        setTrail([{ uid: data.uid, username: data.username || meta.rootUsername || query }]);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to find this ID in your matching team');
+    } finally {
+      setSearching(false);
+    }
   };
 
   return (
     <div className="page">
       <div className="page-head">
-        <h2>Binary Team</h2>
-        <p className="page-sub">Your binary tree by parent placement</p>
+        <h2>Matching Team</h2>
+        <p className="page-sub">Your matching tree by parent placement</p>
       </div>
 
       {error ? <div className="alert error">{error}</div> : null}
-      {loading ? <div className="card">Loading binary team...</div> : null}
+      {loading ? <div className="card">Loading matching team...</div> : null}
 
       {!loading ? (
         <section className="binary-tree-panel card">
           <div className="binary-leg-head">
-            <h3>Binary tree</h3>
+            <h3>Matching tree</h3>
             {trail.length ? (
               <button type="button" className="binary-tree-back" onClick={() => goToTrailIndex(trail.length - 2)}>
                 Back
               </button>
             ) : null}
           </div>
+
+          <form className="binary-tree-search" onSubmit={handleSearch}>
+            <div className="binary-tree-search-field">
+              <input
+                type="search"
+                value={searchId}
+                onChange={(e) => setSearchId(e.target.value)}
+                placeholder="Search team ID (e.g. ARG132550)"
+                aria-label="Search matching team ID"
+                autoComplete="off"
+              />
+            </div>
+            <button type="submit" className="btn primary" disabled={searching || treeLoading}>
+              {searching ? 'Searching…' : 'Search'}
+            </button>
+          </form>
 
           {trail.length ? (
             <nav className="binary-tree-trail" aria-label="Tree path">
@@ -339,7 +387,7 @@ export default function BinaryTeam() {
           ) : (
             <div className="binary-tree-meta">
               <p className="binary-tree-hint">
-                Showing 3 levels. Hover any ID for package &amp; team details. Click a member to open their tree.
+                Showing 3 levels. Search any ID in your team to open their tree. Hover for package &amp; team details.
               </p>
               <div className="binary-tree-legend" aria-label="Status colors">
                 <span className="binary-legend-active">Active</span>
@@ -350,7 +398,7 @@ export default function BinaryTeam() {
 
           <div
             ref={scrollRef}
-            className={`binary-tree-scroll${treeLoading ? ' is-loading' : ''}`}
+            className={`binary-tree-scroll${treeLoading || searching ? ' is-loading' : ''}`}
           >
             <div className="binary-tree-canvas">
               {tree ? (

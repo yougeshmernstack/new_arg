@@ -4,11 +4,11 @@ import { distributorApi } from '../../api';
 const VIEWS = {
   left: {
     title: 'Left Team',
-    subtitle: 'Distributors placed under your left binary leg',
+    subtitle: 'Distributors placed under your left matching leg',
   },
   right: {
     title: 'Right Team',
-    subtitle: 'Distributors placed under your right binary leg',
+    subtitle: 'Distributors placed under your right matching leg',
   },
 };
 

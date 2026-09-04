@@ -80,7 +80,7 @@ const wallets = [
     },
     {
         id: 11,
-        name: "Upline Matching Income",
+        name: "Mentor Income",
         wallet_type: "income",
         status: 1,
         slug: 'upline_matching_income',
