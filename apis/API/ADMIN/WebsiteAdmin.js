@@ -20,6 +20,29 @@ function normalizeFounders(input) {
   }));
 }
 
+function normalizeTestimonials(input) {
+  const list = Array.isArray(input) ? input : [];
+  return list
+    .map((t, i) => {
+      const ratingRaw = Number(t?.rating);
+      const rating = Number.isFinite(ratingRaw)
+        ? Math.min(5, Math.max(1, Math.round(ratingRaw)))
+        : 5;
+      const sortRaw = Number(t?.sortOrder);
+      return {
+        name: String(t?.name || '').trim(),
+        location: String(t?.location || '').trim(),
+        quote: String(t?.quote || '').trim(),
+        rating,
+        photoUrl: String(t?.photoUrl || '').trim(),
+        status: t?.status === 'inactive' ? 'inactive' : 'active',
+        sortOrder: Number.isFinite(sortRaw) ? sortRaw : i,
+        ...(t?._id ? { _id: t._id } : {})
+      };
+    })
+    .filter((t) => t.name || t.quote);
+}
+
 function slugify(value) {
   return String(value || '')
     .toLowerCase()
@@ -32,7 +55,17 @@ class WEBSITE_ADMIN {
   async getWebsiteContent(req, res) {
     try {
       const doc = await WebsiteContent.getOrCreate();
-      return res.status(200).json({ status: 200, message: 'Website content fetched.', data: doc });
+      const CompanyInfo = require('../../MODALS/CompanyInfo');
+      let company = await CompanyInfo.findOne({});
+      if (!company) company = await new CompanyInfo().save();
+
+      const plain = typeof doc.toObject === 'function' ? doc.toObject() : { ...doc };
+      plain.invoiceTax = {
+        gst_number: company.taxInfo?.gst || '',
+        pan: company.taxInfo?.pan || '',
+        gst_percent: Number(company.taxInfo?.gst_percent) || 0
+      };
+      return res.status(200).json({ status: 200, message: 'Website content fetched.', data: plain });
     } catch (error) {
       errorLogger(error);
       return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
@@ -67,6 +100,25 @@ class WEBSITE_ADMIN {
         doc.founders = normalizeFounders(body.founders);
       }
 
+      if (body.testimonials !== undefined) {
+        doc.testimonials = normalizeTestimonials(body.testimonials);
+      }
+
+      if (body.homeStoryEnabled !== undefined) {
+        doc.homeStoryEnabled = Boolean(body.homeStoryEnabled);
+      }
+
+      if (body.socialLinks && typeof body.socialLinks === 'object') {
+        const prev = doc.socialLinks?.toObject?.() || doc.socialLinks || {};
+        const next = { ...prev };
+        for (const key of ['facebook', 'instagram', 'youtube', 'twitter', 'linkedin', 'google', 'whatsapp']) {
+          if (body.socialLinks[key] !== undefined) {
+            next[key] = String(body.socialLinks[key] || '').trim();
+          }
+        }
+        doc.socialLinks = next;
+      }
+
       if (Array.isArray(body.heroSlides)) {
         doc.heroSlides = body.heroSlides
           .filter((s) => s && String(s.imageUrl || '').trim())
@@ -87,6 +139,65 @@ class WEBSITE_ADMIN {
 
       await doc.save();
 
+      // Invoice tax settings live on CompanyInfo
+      let invoiceTax = null;
+      if (body.invoiceTax && typeof body.invoiceTax === 'object') {
+        const CompanyInfo = require('../../MODALS/CompanyInfo');
+        let company = await CompanyInfo.findOne({});
+        if (!company) company = new CompanyInfo();
+
+        const gstNumber = body.invoiceTax.gst_number !== undefined
+          ? String(body.invoiceTax.gst_number || '').trim().toUpperCase()
+          : undefined;
+        const pan = body.invoiceTax.pan !== undefined
+          ? String(body.invoiceTax.pan || '').trim().toUpperCase()
+          : undefined;
+        const pctRaw = body.invoiceTax.gst_percent !== undefined
+          ? Number(body.invoiceTax.gst_percent)
+          : undefined;
+
+        company.set('taxInfo.gst', gstNumber !== undefined
+          ? gstNumber
+          : (company.taxInfo?.gst || ''));
+        company.set('taxInfo.pan', pan !== undefined
+          ? pan
+          : (company.taxInfo?.pan || ''));
+        if (pctRaw !== undefined) {
+          company.set(
+            'taxInfo.gst_percent',
+            Number.isFinite(pctRaw) && pctRaw >= 0 ? pctRaw : 0
+          );
+        }
+
+        // Keep company contact/name aligned with brand page for invoices
+        if (body.name) company.companyName = String(body.name).trim();
+        if (body.contact?.phone !== undefined) {
+          company.set('contactInfo.phone', String(body.contact.phone || '').trim());
+        }
+        if (body.contact?.email !== undefined) {
+          company.set('contactInfo.email', String(body.contact.email || '').trim());
+        }
+        if (body.contact?.website !== undefined) {
+          company.set('contactInfo.website', String(body.contact.website || '').trim());
+        }
+        if (body.contact?.address !== undefined) {
+          company.set('address.street', String(body.contact.address || '').trim());
+        }
+
+        company.markModified('taxInfo');
+        company.markModified('contactInfo');
+        company.markModified('address');
+        await company.save();
+
+        // Reload to confirm persistence
+        const saved = await CompanyInfo.findById(company._id).lean();
+        invoiceTax = {
+          gst_number: saved?.taxInfo?.gst || '',
+          pan: saved?.taxInfo?.pan || '',
+          gst_percent: Number(saved?.taxInfo?.gst_percent) || 0
+        };
+      }
+
       await AuditService.log({
         actor_uid: req.user?.uid,
         actor_role: req.user?.role || 'admin',
@@ -94,10 +205,13 @@ class WEBSITE_ADMIN {
         target_type: 'website_content',
         target_id: doc._id,
         ip: req.ip,
-        meta: { name: doc.name }
+        meta: { name: doc.name, invoiceTax }
       });
 
-      return res.status(200).json({ ...OK, message: 'Website content updated.', data: doc });
+      const plain = typeof doc.toObject === 'function' ? doc.toObject() : { ...doc };
+      if (invoiceTax) plain.invoiceTax = invoiceTax;
+
+      return res.status(200).json({ ...OK, message: 'Website content updated.', data: plain });
     } catch (error) {
       errorLogger(error);
       return res.status(500).json({ ...INTERNAL_SERVER_ERROR });

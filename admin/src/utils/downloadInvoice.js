@@ -8,13 +8,13 @@ export function canDownloadInvoice(order, invoice) {
 
 export async function downloadOrderInvoice(orderId, fallbackName = 'invoice') {
   const res = await commerceApi.downloadInvoice(orderId);
-  const blob = new Blob([res.data], { type: 'text/html;charset=utf-8' });
+  const blob = new Blob([res.data], { type: 'application/pdf' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   const disposition = res.headers?.['content-disposition'] || '';
   const match = /filename="?([^"]+)"?/i.exec(disposition);
   a.href = url;
-  a.download = match?.[1] || `${fallbackName}.html`;
+  a.download = match?.[1] || `${fallbackName}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();

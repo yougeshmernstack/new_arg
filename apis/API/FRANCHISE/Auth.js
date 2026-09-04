@@ -9,6 +9,7 @@ const form_validator = require('../../utils/form-validators');
 const { nextPanelUid } = require('../../utils/panelIdentity');
 const { ensurePanelWallet } = require('../../utils/panelWallet');
 const { errorLogger } = require('../../utils/logger');
+const sms = require('../../SERVICES/SmsService');
 const { loginSuccess, registrationSuccess, REQUEST_SUCCESS } = require('../../utils/successMessages');
 const { INTERNAL_SERVER_ERROR, INVALID_CREDENTIALS, USERNAME_ALREADY_EXISTS, INVALID_USERNAME } = require('../../utils/errorMessages');
 
@@ -402,6 +403,14 @@ class ADMIN_FRANCHISE {
                 ip: req.ip,
                 meta: { username: franchise.username, business_name: franchise.business_name }
             });
+
+            if (franchise.mobile) {
+                try {
+                    await sms.usernameSms(franchise.mobile, franchise.username, isStrongPassword.password);
+                } catch (smsErr) {
+                    errorLogger(smsErr);
+                }
+            }
 
             return res.status(201).json({
                 ...registrationSuccess,

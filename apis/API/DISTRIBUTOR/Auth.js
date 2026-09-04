@@ -13,6 +13,7 @@ const { nextPanelUid } = require('../../utils/panelIdentity');
 const { ensurePanelWallet, ensureWalletSlug } = require('../../utils/panelWallet');
 const { errorLogger } = require('../../utils/logger');
 const Email = require('../../SERVICES/SendEmail');
+const sms = require('../../SERVICES/SmsService');
 const { loginSuccess, registrationSuccess, REQUEST_SUCCESS } = require('../../utils/successMessages');
 const {
     resolvePlacement,
@@ -230,6 +231,14 @@ class DISTRIBUTOR_AUTH {
                 });
             } catch (mailErr) {
                 errorLogger(mailErr);
+            }
+
+            if (distributor.mobile) {
+                try {
+                    await sms.usernameSms(distributor.mobile, distributor.username, isStrongPassword.password);
+                } catch (smsErr) {
+                    errorLogger(smsErr);
+                }
             }
 
             const payload = {

@@ -17,6 +17,16 @@ const founderSchema = new mongoose.Schema({
   photoUrl: { type: String, default: '' }
 }, { _id: false });
 
+const testimonialSchema = new mongoose.Schema({
+  name: { type: String, default: '' },
+  location: { type: String, default: '' },
+  quote: { type: String, default: '' },
+  rating: { type: Number, default: 5, min: 1, max: 5 },
+  photoUrl: { type: String, default: '' },
+  status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+  sortOrder: { type: Number, default: 0 }
+}, { _id: true });
+
 const contactSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
   email: { type: String, default: '' },
@@ -69,9 +79,24 @@ const websiteContentSchema = new mongoose.Schema({
       message: 'At most 2 founders allowed.'
     }
   },
+  testimonials: { type: [testimonialSchema], default: [] },
   logo: { type: String, default: '' },
   heroImage: { type: String, default: '' },
   heroSlides: { type: [heroSlideSchema], default: [] },
+  /** Homepage “Why … / motto / pillars” block visibility */
+  homeStoryEnabled: { type: Boolean, default: true },
+  socialLinks: {
+    type: new mongoose.Schema({
+      facebook: { type: String, default: '' },
+      instagram: { type: String, default: '' },
+      youtube: { type: String, default: '' },
+      twitter: { type: String, default: '' },
+      linkedin: { type: String, default: '' },
+      google: { type: String, default: '' },
+      whatsapp: { type: String, default: '' }
+    }, { _id: false }),
+    default: () => ({})
+  },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });

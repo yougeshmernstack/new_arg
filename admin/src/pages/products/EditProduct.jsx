@@ -32,6 +32,7 @@ export default function EditProduct() {
         franchise_price: p.franchise_price ?? '',
         bv: p.bv ?? '',
         gst: p.gst ?? '',
+        hsn_code: p.hsn_code || '',
         weight: p.weight || '',
         status: p.status || 'enabled',
         is_hidden: Boolean(p.is_hidden),
@@ -206,6 +207,10 @@ export default function EditProduct() {
         <label>
           GST %
           <input name="gst" type="number" min="0" step="0.01" value={form.gst} onChange={onChange} />
+        </label>
+        <label>
+          HSN Code
+          <input name="hsn_code" value={form.hsn_code} onChange={onChange} placeholder="e.g. 2009" />
         </label>
         <label>
           Weight

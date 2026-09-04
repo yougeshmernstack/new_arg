@@ -101,6 +101,7 @@ export default function Products() {
                   { header: 'ID', value: (r) => r.productId ?? '' },
                   { header: 'Name', value: (r) => r.product_name || '' },
                   { header: 'SKU', value: (r) => r.sku || '' },
+                  { header: 'HSN', value: (r) => r.hsn_code || '' },
                   { header: 'Stock', value: (r) => r.stock ?? r.available_stock ?? '' },
                   { header: 'MRP', value: (r) => formatExcelAmount(r.mrp) },
                   {

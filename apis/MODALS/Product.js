@@ -21,6 +21,7 @@ const productSchema = new mongoose.Schema({
     batch_number: { type: String, default: '' },
     expiry_date: { type: Date, default: null },
     weight: { type: String, default: '' },
+    hsn_code: { type: String, default: '' },
     gst: { type: Number, default: 0 },
     mrp: { type: Number, required: true, default: 0 },
     distributor_price: { type: Number, required: true, default: 0 },

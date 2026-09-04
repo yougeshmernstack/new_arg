@@ -58,10 +58,11 @@ class EMAIL {
                 ? invoice.pdf_path
                 : path.join(__dirname, "..", invoice.pdf_path);
             if (fs.existsSync(abs)) {
+                const isPdf = /\.pdf$/i.test(abs);
                 attachments.push({
-                    filename: `${invoice.invoice_number || "invoice"}.html`,
+                    filename: `${invoice.invoice_number || "invoice"}${isPdf ? ".pdf" : ".html"}`,
                     path: abs,
-                    contentType: "text/html",
+                    contentType: isPdf ? "application/pdf" : "text/html",
                 });
             }
         }

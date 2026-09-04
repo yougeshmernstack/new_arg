@@ -42,6 +42,8 @@ theme.get('/catalog-products', ThemeCatalog.listProducts);
 theme.get('/catalog-product', ThemeCatalog.getProduct);
 theme.get('/catalog-packages', ThemeCatalog.listPackages);
 theme.get('/catalog-package', ThemeCatalog.getPackage);
+theme.get('/lookup-invoice', Storefront.lookupInvoice);
+theme.get('/download-invoice-by-number', Storefront.downloadInvoiceByNumber);
 
 theme.get('/get-products', Storefront.listProducts);
 theme.get('/get-product', Storefront.getProduct);

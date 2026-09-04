@@ -232,10 +232,14 @@ async function attachBuyerProfiles(orders = []) {
     return orders.map((order) => {
         const plain = order && typeof order.toObject === 'function' ? order.toObject() : { ...order };
         const profile = profileMap[`${plain.buyer_role}:${plain.buyer_uid}`] || {};
+        const guestName =
+            plain.buyer_role === 'guest'
+                ? (plain.billing_address?.name || plain.shipping_address?.name || '')
+                : '';
         return {
             ...plain,
-            buyer_name: profile.buyer_name || '',
-            buyer_username: profile.buyer_username || '',
+            buyer_name: profile.buyer_name || guestName || '',
+            buyer_username: profile.buyer_username || (plain.buyer_role === 'guest' ? 'Guest' : ''),
             buyer_panel_id: profile.buyer_panel_id || null,
             highest_package_name: profile.highest_package_name || '',
             highest_package_bv: Number(profile.highest_package_bv || 0)
@@ -262,7 +266,11 @@ class ORDER_ADMIN {
                 const or = [
                     { order_number: { $regex: search, $options: 'i' } },
                     { invoice_number: { $regex: search, $options: 'i' } },
-                    { package_name: { $regex: search, $options: 'i' } }
+                    { package_name: { $regex: search, $options: 'i' } },
+                    { 'shipping_address.name': { $regex: search, $options: 'i' } },
+                    { 'billing_address.name': { $regex: search, $options: 'i' } },
+                    { 'shipping_address.mobile': { $regex: search, $options: 'i' } },
+                    { 'billing_address.mobile': { $regex: search, $options: 'i' } }
                 ];
                 const asUid = Number(search);
                 if (Number.isFinite(asUid) && String(asUid) === search) {
@@ -626,11 +634,75 @@ class ORDER_ADMIN {
 
             const InvoiceDocument = require('../../SERVICES/InvoiceDocument');
             const result = await InvoiceDocument.ensurePaidInvoiceDocument(orderId);
-            const filename = `${result.invoice.invoice_number || `order-${orderId}`}.html`;
+            const filename = `${result.invoice.invoice_number || `order-${orderId}`}.pdf`;
+            const pdfBuffer = result.pdf || (result.pdf_path
+                ? require('fs').readFileSync(require('path').join(__dirname, '../..', result.pdf_path))
+                : null);
+            if (!pdfBuffer) {
+                return res.status(500).json({ code: 500, message: 'Failed to generate PDF invoice.' });
+            }
 
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-            return res.status(200).send(result.html);
+            res.setHeader('Content-Length', pdfBuffer.length);
+            return res.status(200).send(pdfBuffer);
+        } catch (error) {
+            if (error.status) {
+                return res.status(error.status).json({ code: error.status, message: error.message });
+            }
+            errorLogger(error);
+            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
+        }
+    }
+
+    async createGuestInvoice(req, res) {
+        try {
+            const {
+                customer,
+                billing_address,
+                shipping_address,
+                items,
+                remark,
+                deduct_stock
+            } = req.body || {};
+
+            const result = await CommerceService.createGuestInvoice({
+                adminUser: req.user,
+                customer: customer || {},
+                billing_address: billing_address || {},
+                shipping_address: shipping_address || {},
+                items: items || [],
+                remark: remark || '',
+                deduct_stock: deduct_stock !== false
+            });
+
+            await AuditService.log({
+                actor_uid: req.user.uid,
+                actor_role: req.user.role || 'admin',
+                action: 'CREATE_GUEST_INVOICE',
+                target_uid: 0,
+                target_role: 'guest',
+                target_type: 'invoice',
+                target_id: result.invoice.invoiceId,
+                ip: req.ip,
+                meta: {
+                    order_number: result.order.order_number,
+                    invoice_number: result.invoice.invoice_number,
+                    customer_name: result.invoice.customer_details?.name,
+                    grand_total: result.order.grand_total
+                }
+            });
+
+            return res.status(200).json({
+                ...REQUEST_SUCCESS,
+                message: 'Guest invoice created.',
+                data: {
+                    order: result.order,
+                    invoice: result.invoice,
+                    invoice_number: result.invoice.invoice_number,
+                    order_number: result.order.order_number
+                }
+            });
         } catch (error) {
             if (error.status) {
                 return res.status(error.status).json({ code: error.status, message: error.message });

@@ -4,6 +4,35 @@ const path = require('path');
 
 const TEMPLETE_DIR = path.join(__dirname, '../templete');
 
+function publicApiBase() {
+    const fromEnv =
+        process.env.PUBLIC_API_URL ||
+        process.env.API_PUBLIC_URL ||
+        process.env.APP_URL ||
+        '';
+    if (fromEnv) return String(fromEnv).replace(/\/$/, '');
+    return 'https://apis.arogyagreenlife.com';
+}
+
+async function loadSiteSocial() {
+    try {
+        const WebsiteContent = require('../MODALS/WebsiteContent');
+        const doc = await WebsiteContent.getOrCreate();
+        const raw = doc.socialLinks?.toObject?.() || doc.socialLinks || {};
+        return {
+            facebook: raw.facebook || '',
+            instagram: raw.instagram || '',
+            youtube: raw.youtube || '',
+            twitter: raw.twitter || '',
+            linkedin: raw.linkedin || '',
+            google: raw.google || '',
+            whatsapp: raw.whatsapp || '',
+        };
+    } catch (_) {
+        return {};
+    }
+}
+
 class MailerService {
     getTransporter() {
         const port = Number(process.env.SMTP_PORT) || 465;
@@ -38,9 +67,30 @@ class MailerService {
             throw new Error('SMTP is not configured in environment');
         }
 
+        const socialLinks = data.socialLinks || (await loadSiteSocial());
+        const socialIconBase = `${publicApiBase()}/templete/assets/social`;
+        const logoPathJpg = path.join(TEMPLETE_DIR, 'assets/brand/logo.jpg');
+        const logoPathPng = path.join(TEMPLETE_DIR, 'assets/brand/logo.png');
+        const fs = require('fs');
+        const logoFile = fs.existsSync(logoPathJpg)
+            ? logoPathJpg
+            : fs.existsSync(logoPathPng)
+              ? logoPathPng
+              : null;
+        const logoFilename = logoFile ? path.basename(logoFile) : 'logo.jpg';
+        const logoUrl = `${publicApiBase()}/templete/assets/brand/${logoFilename}`;
+        const logoCid = 'arogyagreenlife-logo';
+
         const html = await ejs.renderFile(
             path.join(TEMPLETE_DIR, `${template}.ejs`),
-            data
+            {
+                ...data,
+                socialLinks,
+                socialIconBase,
+                logoUrl,
+                logoCid: `cid:${logoCid}`,
+            },
+            { root: TEMPLETE_DIR }
         );
 
         const mailOptions = {
@@ -48,9 +98,21 @@ class MailerService {
             to,
             subject,
             html,
+            attachments: [],
         };
+        if (logoFile) {
+            mailOptions.attachments.push({
+                filename: logoFilename,
+                path: logoFile,
+                cid: logoCid,
+                contentDisposition: 'inline',
+            });
+        }
         if (attachments && attachments.length) {
-            mailOptions.attachments = attachments;
+            mailOptions.attachments.push(...attachments);
+        }
+        if (!mailOptions.attachments.length) {
+            delete mailOptions.attachments;
         }
 
         await this.getTransporter().sendMail(mailOptions);

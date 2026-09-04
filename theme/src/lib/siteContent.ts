@@ -37,9 +37,27 @@ export type ThemeBrand = {
     supportNote: string;
   };
   founders: { name: string; role: string; bio: string; photoUrl: string }[];
+  testimonials: {
+    id: string;
+    name: string;
+    location: string;
+    quote: string;
+    rating: number;
+    photoUrl: string;
+  }[];
   logo: string;
   heroImage: string;
   heroSlides: HeroSlide[];
+  homeStoryEnabled: boolean;
+  socialLinks: {
+    facebook: string;
+    instagram: string;
+    youtube: string;
+    twitter: string;
+    linkedin: string;
+    google: string;
+    whatsapp: string;
+  };
 };
 
 function resolveMedia(path?: string | null, fallback = ''): string {
@@ -89,8 +107,32 @@ export function mapSiteContent(data?: SiteContent | null): ThemeBrand {
         bio: f.bio || '',
         photoUrl: resolveMedia(f.photoUrl),
       })),
+    testimonials: (() => {
+      const raw = Array.isArray(src.testimonials) ? src.testimonials : [];
+      return raw
+        .filter((t) => t?.name && t?.quote && t.status !== 'inactive')
+        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+        .map((t, i) => ({
+          id: String(t._id || `${t.name}-${i}`),
+          name: t.name || '',
+          location: t.location || '',
+          quote: t.quote || '',
+          rating: Math.min(5, Math.max(1, Number(t.rating) || 5)),
+          photoUrl: resolveMedia(t.photoUrl),
+        }));
+    })(),
     logo: resolveMedia(src.logo, fallbackBrand.logo) || fallbackBrand.logo,
     heroImage: resolveMedia(src.heroImage, fallbackBrand.heroImage) || fallbackBrand.heroImage,
+    homeStoryEnabled: src.homeStoryEnabled !== false,
+    socialLinks: {
+      facebook: src.socialLinks?.facebook || '',
+      instagram: src.socialLinks?.instagram || '',
+      youtube: src.socialLinks?.youtube || '',
+      twitter: src.socialLinks?.twitter || '',
+      linkedin: src.socialLinks?.linkedin || '',
+      google: src.socialLinks?.google || '',
+      whatsapp: src.socialLinks?.whatsapp || '',
+    },
     heroSlides: (() => {
       const raw = Array.isArray(src.heroSlides) ? src.heroSlides : [];
       const mapped = raw

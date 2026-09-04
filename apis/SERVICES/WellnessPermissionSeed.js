@@ -17,6 +17,10 @@ const BUYER_STOREFRONT = (routeFor, role) => [
 ];
 
 const WELLNESS_PERMISSIONS = [
+    // Admin – public auth
+    { route: '/login', routeFor: 'admin', method: 'POST', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Admin login' },
+    { route: '/forgot-password', routeFor: 'admin', method: 'POST', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Admin forgot password' },
+
     // Admin – franchise management & login-as
     { route: '/create-franchise', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { label: 'Create Franchise', showInMenu: false }, description: 'Admin creates franchise' },
     { route: '/get-franchises', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { label: 'Franchises', icon: 'store', order: 20, showInMenu: true }, description: 'List franchises' },
@@ -54,6 +58,7 @@ const WELLNESS_PERMISSIONS = [
     { route: '/verify-order-payment', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Verify order payment proof and confirm order' },
     { route: '/reject-order-payment', routeFor: 'admin', method: 'POST', roles: ['admin'], menuMeta: { showInMenu: false }, description: 'Reject order payment proof' },
     { route: '/download-invoice', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { showInMenu: false }, description: 'Download commerce order invoice' },
+    { route: '/create-guest-invoice', routeFor: 'admin', method: 'POST', roles: ['admin', 'manager'], menuMeta: { label: 'Create Guest Invoice', icon: 'orders', order: 41, showInMenu: true }, description: 'Create guest invoice without username' },
 
     // Admin – fund wallet payment settings & deposits
     { route: '/get-payment-settings', routeFor: 'admin', method: 'GET', roles: ['admin', 'manager'], menuMeta: { label: 'Payment Settings', icon: 'wallet', order: 50, showInMenu: true }, description: 'Get company bank/UPI settings' },
@@ -154,6 +159,8 @@ const WELLNESS_PERMISSIONS = [
     { route: '/catalog-product', routeFor: 'theme', method: 'GET', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Public product detail' },
     { route: '/catalog-packages', routeFor: 'theme', method: 'GET', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Public package catalog' },
     { route: '/catalog-package', routeFor: 'theme', method: 'GET', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Public package detail' },
+    { route: '/lookup-invoice', routeFor: 'theme', method: 'GET', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Public invoice lookup by invoice number' },
+    { route: '/download-invoice-by-number', routeFor: 'theme', method: 'GET', roles: ['public'], menuMeta: { showInMenu: false }, description: 'Public invoice PDF download by invoice number' },
     ...BUYER_STOREFRONT('theme', 'theme')
 ];
 

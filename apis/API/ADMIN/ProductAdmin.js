@@ -15,7 +15,7 @@ class PRODUCT_ADMIN {
                 product_name, sku, categoryId, brandId, packageId,
                 images, videos, description_images, description, ingredients, benefits,
                 nutrition_facts, directions, storage, manufacturing_details,
-                batch_number, expiry_date, weight, gst, mrp,
+                batch_number, expiry_date, weight, hsn_code, gst, mrp,
                 distributor_price, franchise_price, bv, stock, status, is_hidden
             } = req.body;
 
@@ -48,6 +48,7 @@ class PRODUCT_ADMIN {
                 batch_number: batch_number || '',
                 expiry_date: expiry_date ? new Date(expiry_date) : null,
                 weight: weight || '',
+                hsn_code: String(hsn_code || '').trim(),
                 gst: Number(gst) || 0,
                 mrp: Number(mrp) || 0,
                 distributor_price: Number(distributor_price) || 0,
@@ -108,7 +109,7 @@ class PRODUCT_ADMIN {
             const fields = [
                 'product_name', 'description', 'ingredients', 'nutrition_facts',
                 'directions', 'storage', 'manufacturing_details', 'batch_number',
-                'weight', 'gst', 'mrp', 'distributor_price', 'franchise_price', 'bv', 'status'
+                'weight', 'hsn_code', 'gst', 'mrp', 'distributor_price', 'franchise_price', 'bv', 'status'
             ];
             for (const key of fields) {
                 if (req.body[key] !== undefined) {
@@ -116,6 +117,8 @@ class PRODUCT_ADMIN {
                         product[key] = Math.max(0, Number(req.body[key]) || 0);
                     } else if (key === 'status') {
                         product.status = req.body.status === 'disabled' ? 'disabled' : 'enabled';
+                    } else if (key === 'hsn_code') {
+                        product.hsn_code = String(req.body.hsn_code || '').trim();
                     } else {
                         product[key] = req.body[key];
                     }

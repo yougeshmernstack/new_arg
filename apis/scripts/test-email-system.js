@@ -1,7 +1,7 @@
 /**
  * Self-test for email mailer + templates + OTP helpers.
  * Usage: node scripts/test-email-system.js [--send]
- *   --send  also fires one real welcome test mail to FROM_EMAIL / SMTP_USER
+ *   --send  also fires one real welcome test mail to yash947222@gmail.com
  */
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
@@ -163,7 +163,7 @@ async function testSmtpVerify() {
 }
 
 async function testLiveSend() {
-    const to = process.env.FROM_EMAIL || process.env.SMTP_USER;
+    const to = 'yash947222@gmail.com';
     await Email.sendWelcome({
         email: to,
         name: 'Mailer Test',

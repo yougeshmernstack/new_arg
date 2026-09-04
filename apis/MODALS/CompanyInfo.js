@@ -37,12 +37,20 @@ const companySchema = new mongoose.Schema({
   taxInfo: {
     pan: {
       type: String,
+      default: ''
     },
     gst: {
       type: String,
+      default: ''
     },
     tan: {
       type: String,
+      default: ''
+    },
+    // Company-wide GST % applied on tax invoices (package/product)
+    gst_percent: {
+      type: Number,
+      default: 0
     }
   },
   ceo: {

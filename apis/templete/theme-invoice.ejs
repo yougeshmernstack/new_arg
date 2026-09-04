@@ -59,6 +59,20 @@
       color: var(--accent);
       font-weight: 800;
     }
+    .company-brand {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .company-logo {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
+      flex-shrink: 0;
+    }
     .company-meta { color: var(--muted); font-size: 11px; }
     .company-meta div { margin: 1px 0; }
     .title-box { text-align: right; }
@@ -264,14 +278,20 @@
     <table class="head">
       <tr>
         <td style="width:58%">
-          <h1 class="company-name"><%= company.name %></h1>
-          <div class="company-meta">
-            <% if (company.address) { %><div><%= company.address %></div><% } %>
-            <% if (company.mobile) { %><div>Phone: <%= company.mobile %></div><% } %>
-            <% if (company.email) { %><div>Email: <%= company.email %></div><% } %>
-            <% if (company.website) { %><div>Web: <%= company.website %></div><% } %>
-            <% if (company.gst_number) { %><div><strong>GSTIN:</strong> <%= company.gst_number %></div><% } %>
-            <% if (company.pan) { %><div><strong>PAN:</strong> <%= company.pan %></div><% } %>
+          <div class="company-brand">
+            <% if (company.logo) { %>
+              <img class="company-logo" src="<%= company.logo %>" alt="<%= company.name %> logo" />
+            <% } %>
+            <div>
+              <h1 class="company-name"><%= company.name %></h1>
+              <div class="company-meta">
+                <% if (company.address) { %><div><%= company.address %></div><% } %>
+                <% if (company.mobile) { %><div>Phone: <%= company.mobile %></div><% } %>
+                <% if (company.email) { %><div>Email: <%= company.email %></div><% } %>
+                <% if (company.website) { %><div>Web: <%= company.website %></div><% } %>
+                <div><strong>GSTIN:</strong> <%= company.gst_number || '—' %></div>
+              </div>
+            </div>
           </div>
         </td>
         <td class="title-box" style="width:42%">
@@ -334,6 +354,7 @@
         <tr>
           <th style="width:40px" class="center">#</th>
           <th>Description</th>
+          <th style="width:90px">HSN</th>
           <th style="width:90px">SKU</th>
           <th style="width:55px" class="center">Qty</th>
           <th style="width:95px" class="num">Rate (₹)</th>
@@ -342,15 +363,17 @@
       </thead>
       <tbody>
         <% if (!items.length) { %>
-          <tr><td colspan="6" class="center">No items</td></tr>
+          <tr><td colspan="7" class="center">No items</td></tr>
         <% } %>
         <% items.forEach(function(item) { %>
           <tr>
             <td class="center"><%= item.sno %></td>
             <td>
               <strong><%= item.product_name %></strong>
+              <% if (item.gst > 0) { %><div class="muted-line">GST <%= Number(item.gst) %>%</div><% } %>
               <% if (item.discount > 0) { %><div class="muted-line">Discount: ₹<%= money(item.discount) %></div><% } %>
             </td>
+            <td><%= item.hsn_code || '—' %></td>
             <td><%= item.sku %></td>
             <td class="center"><%= item.quantity %></td>
             <td class="num"><%= money(item.price) %></td>
@@ -384,7 +407,7 @@
                 <td class="num">₹<%= money(invoice.discount || 0) %></td>
               </tr>
               <tr>
-                <td>Tax / GST</td>
+                <td><% if (gst_percent > 0) { %>GST @ <%= Number(gst_percent) %>%<% } else { %>Tax / GST<% } %></td>
                 <td class="num">₹<%= money(invoice.tax || invoice.gst || 0) %></td>
               </tr>
               <tr class="grand">
@@ -411,8 +434,9 @@
         <td style="width:42%">
           <div class="sign-pad right">
             <div class="section-title">For <%= company.name %></div>
-            <div class="sign-space"></div>
-            <div class="sign-who">Authorized Signatory</div>
+            <p class="note" style="margin:12px 0 0">
+              This is a computer-generated invoice; no signature is required.
+            </p>
           </div>
         </td>
       </tr>

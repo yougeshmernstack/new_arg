@@ -92,6 +92,7 @@ admin.post('/update-order-shipping', OrderAdmin.updateShipping);
 admin.post('/verify-order-payment', OrderAdmin.verifyOrderPayment);
 admin.post('/reject-order-payment', OrderAdmin.rejectOrderPayment);
 admin.get('/download-invoice', OrderAdmin.downloadInvoice);
+admin.post('/create-guest-invoice', OrderAdmin.createGuestInvoice);
 
 // ===== Fund Wallet — Payment settings & deposits =====
 admin.get('/get-payment-settings', PaymentSettings.getPaymentSettings);

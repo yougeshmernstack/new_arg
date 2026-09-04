@@ -94,8 +94,28 @@ export type SiteContent = {
     supportNote?: string;
   };
   founders?: { name: string; role: string; bio: string; photoUrl: string }[];
+  testimonials?: {
+    _id?: string;
+    name?: string;
+    location?: string;
+    quote?: string;
+    rating?: number;
+    photoUrl?: string;
+    status?: string;
+    sortOrder?: number;
+  }[];
   logo?: string;
   heroImage?: string;
+  homeStoryEnabled?: boolean;
+  socialLinks?: {
+    facebook?: string;
+    instagram?: string;
+    youtube?: string;
+    twitter?: string;
+    linkedin?: string;
+    google?: string;
+    whatsapp?: string;
+  };
   heroSlides?: {
     _id?: string;
     imageUrl?: string;
@@ -191,7 +211,7 @@ export const themeApi = {
     const blob = await res.blob();
     const disposition = res.headers.get('content-disposition') || '';
     const match = /filename="?([^"]+)"?/i.exec(disposition);
-    return { blob, filename: match?.[1] || `invoice-${orderId}.html` };
+    return { blob, filename: match?.[1] || `invoice-${orderId}.pdf` };
   },
   getPaymentMethods: () => request('/get-payment-methods'),
   submitOrderPayment: async (formData: FormData) => {
@@ -237,4 +257,25 @@ export const themeApi = {
   },
   catalogPackage: (packageId: number | string) =>
     publicRequest(`/catalog-package?packageId=${packageId}`),
+
+  lookupInvoice: (invoiceNumber: string) =>
+    publicRequest(`/lookup-invoice?invoice_number=${encodeURIComponent(invoiceNumber.trim())}`),
+
+  downloadInvoiceByNumber: async (invoiceNumber: string) => {
+    const res = await fetch(
+      `${API_BASE}${API_PREFIX}/download-invoice-by-number?invoice_number=${encodeURIComponent(invoiceNumber.trim())}`,
+      { method: 'GET', cache: 'no-store' },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.message || `Request failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('content-disposition') || '';
+    const match = /filename="?([^"]+)"?/i.exec(disposition);
+    return {
+      blob,
+      filename: match?.[1] || `invoice-${invoiceNumber}.pdf`,
+    };
+  },
 };

@@ -5,6 +5,7 @@ const invoiceItemSchema = new mongoose.Schema({
     productId: { type: Number, required: true },
     sku: { type: String, required: true },
     product_name: { type: String, required: true },
+    hsn_code: { type: String, default: '' },
     quantity: { type: Number, required: true },
     price: { type: Number, required: true },
     discount: { type: Number, default: 0 },
@@ -21,7 +22,7 @@ const invoiceSchema = new mongoose.Schema({
     customer_uid: { type: Number, required: true },
     customer_role: {
         type: String,
-        enum: ['franchise', 'distributor', 'theme'],
+        enum: ['franchise', 'distributor', 'theme', 'guest'],
         required: true
     },
     customer_details: {
@@ -29,6 +30,8 @@ const invoiceSchema = new mongoose.Schema({
         email: { type: String, default: '' },
         mobile: { type: String, default: '' },
         address: { type: String, default: '' },
+        billing_address: { type: String, default: '' },
+        shipping_address: { type: String, default: '' },
         gst_number: { type: String, default: '' }
     },
     company_details: {
@@ -37,6 +40,8 @@ const invoiceSchema = new mongoose.Schema({
         mobile: { type: String, default: '' },
         address: { type: String, default: '' },
         gst_number: { type: String, default: '' },
+        pan: { type: String, default: '' },
+        gst_percent: { type: Number, default: 0 },
         logo: { type: String, default: null }
     },
     items: { type: [invoiceItemSchema], default: [] },

@@ -1,0 +1,37 @@
+<%#
+  Expects: socialLinks = { facebook, instagram, youtube, twitter, linkedin, google, whatsapp }
+  Optional: socialIconBase = absolute base URL for PNG icons (…/templete/assets/social)
+%>
+<%
+  const links = (typeof socialLinks !== 'undefined' && socialLinks) ? socialLinks : {};
+  const base = (typeof socialIconBase !== 'undefined' && socialIconBase) ? String(socialIconBase).replace(/\/$/, '') : '';
+  const items = [
+    { key: 'facebook', label: 'Facebook', color: '#1877F2', file: 'facebook.png' },
+    { key: 'instagram', label: 'Instagram', color: '#E4405F', file: 'instagram.png' },
+    { key: 'youtube', label: 'YouTube', color: '#FF0000', file: 'youtube.png' },
+    { key: 'twitter', label: 'X', color: '#111111', file: 'x.png' },
+    { key: 'linkedin', label: 'LinkedIn', color: '#0A66C2', file: 'linkedin.png' },
+    { key: 'google', label: 'Google', color: '#EA4335', file: 'google.png' },
+    { key: 'whatsapp', label: 'WhatsApp', color: '#25D366', file: 'whatsapp.png' },
+  ].filter((item) => links[item.key] && String(links[item.key]).trim());
+%>
+<% if (items.length) { %>
+<table role="presentation" cellspacing="0" cellpadding="0" style="margin:12px 0 4px;">
+  <tr>
+    <td style="font-size:12px;color:#64748b;padding:0 0 8px;">Follow us</td>
+  </tr>
+  <tr>
+    <td>
+      <% items.forEach(function (item) { %>
+      <a href="<%= String(links[item.key]).trim() %>" target="_blank" rel="noopener noreferrer" title="<%= item.label %>" style="display:inline-block;margin:0 6px 6px 0;text-decoration:none;">
+        <% if (base) { %>
+        <img src="<%= base %>/<%= item.file %>" width="28" height="28" alt="<%= item.label %>" style="display:block;border:0;border-radius:6px;" />
+        <% } else { %>
+        <span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:6px;background:<%= item.color %>;color:#ffffff;font-size:11px;font-weight:800;"><%= item.label.charAt(0) %></span>
+        <% } %>
+      </a>
+      <% }) %>
+    </td>
+  </tr>
+</table>
+<% } %>

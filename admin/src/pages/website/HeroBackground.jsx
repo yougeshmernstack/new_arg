@@ -161,8 +161,8 @@ export default function HeroBackground() {
       resetForm();
       setSuccess(
         editingId
-          ? 'Slide updated. Theme homepage slider refreshes on next load.'
-          : 'Slide added. Theme homepage auto-rotates every 1.5s (right → left).'
+          ? 'Slide updated. Theme homepage refreshes on next load.'
+          : 'Slide added. Theme homepage auto-rotates active slides.'
       );
       await load();
     } catch (err) {
@@ -226,20 +226,15 @@ export default function HeroBackground() {
         <div>
           <h2>Hero Background</h2>
           <p className="page-sub">
-            Theme homepage full-bleed slider. Slides auto-play right → left every 1.5s. Optional link opens when
-            the slide image is clicked.
+            Homepage banner slider (16:9). Add multiple photos — they auto-rotate with animation. Each photo can
+            open a link when clicked.
           </p>
         </div>
       </div>
 
       <div className="alert info banner-size-note">
-        <strong>Link URL examples:</strong>
-        <span>
-          {' '}
-          <code>/products</code> (shop catalog), <code>/packages</code> (packages), <code>/shop</code> (live
-          store), or a full URL like <code>https://…</code>. Leave blank if the slide should not be clickable —
-          CTA buttons on the page still go to Products / Packages.
-        </span>
+        <strong>Image size:</strong>
+        <span> Use 16:9 photos (e.g. 1920×1080). Wider/taller images are cropped to center.</span>
       </div>
 
       {error ? <div className="alert error">{error}</div> : null}
@@ -257,14 +252,6 @@ export default function HeroBackground() {
             />
           </label>
           <label>
-            Link URL (optional)
-            <input
-              value={form.linkUrl}
-              onChange={(e) => setField('linkUrl', e.target.value)}
-              placeholder="/products  or  /packages  or  https://…"
-            />
-          </label>
-          <label>
             Sort order
             <input
               type="number"
@@ -279,8 +266,47 @@ export default function HeroBackground() {
               <option value="inactive">Inactive</option>
             </select>
           </label>
+
+          <div className="full hero-link-box">
+            <div className="hero-link-box-head">
+              <strong>Click link (optional)</strong>
+              <span>Jab user is photo pe click kare, yeh page / URL khulegi</span>
+            </div>
+            <label className="hero-link-field">
+              Link URL
+              <input
+                value={form.linkUrl}
+                onChange={(e) => setField('linkUrl', e.target.value)}
+                placeholder="/products   or   https://example.com"
+                autoComplete="off"
+              />
+            </label>
+            <div className="hero-link-presets" role="group" aria-label="Quick link presets">
+              {[
+                { label: 'Products', value: '/products' },
+                { label: 'Packages', value: '/packages' },
+                { label: 'Shop', value: '/shop' },
+                { label: 'Contact', value: '/contact' },
+                { label: 'No link', value: '' },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  className={`btn ghost hero-link-preset${form.linkUrl === preset.value ? ' is-active' : ''}`}
+                  onClick={() => setField('linkUrl', preset.value)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <p className="muted hero-link-help">
+              Internal: <code>/products</code>, <code>/packages</code>, <code>/shop</code> · External: full URL
+              like <code>https://…</code> · Empty = photo not clickable
+            </p>
+          </div>
+
           <label className="full">
-            Slide image (wide landscape, e.g. 1920×1080+)
+            Slide image (16:9 landscape, e.g. 1920×1080)
             <input
               ref={fileRef}
               type="file"
@@ -293,7 +319,10 @@ export default function HeroBackground() {
           {form.imageUrl ? (
             <div className="full hero-bg-preview-wrap">
               <img className="hero-bg-preview" src={mediaUrl(form.imageUrl)} alt="Slide preview" />
-              <span className="hero-bg-badge custom">Preview</span>
+              <span className="hero-bg-badge custom">16:9 preview</span>
+              {form.linkUrl ? (
+                <span className="hero-bg-badge hero-bg-badge-link">Link: {form.linkUrl}</span>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -311,8 +340,8 @@ export default function HeroBackground() {
           </Link>
         </div>
         <p className="muted hero-bg-hint">
-          Recommended: wide landscape photo (e.g. 1920×1080+), JPEG or WebP, under 10&nbsp;MB. Multiple active
-          slides create the homepage carousel.
+          Recommended: 1920×1080 (16:9), JPEG or WebP, under 10&nbsp;MB. Multiple active slides create the
+          homepage carousel.
         </p>
       </form>
 
@@ -329,7 +358,7 @@ export default function HeroBackground() {
               <tr>
                 <th>Preview</th>
                 <th>Title</th>
-                <th>Link</th>
+                <th>Click link</th>
                 <th>Sort</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -345,7 +374,25 @@ export default function HeroBackground() {
                   </td>
                   <td>{item.title || '—'}</td>
                   <td>
-                    <code className="hero-bg-link-cell">{item.linkUrl || '—'}</code>
+                    {item.linkUrl ? (
+                      <a
+                        className="hero-bg-link-cell is-set"
+                        href={
+                          /^https?:\/\//i.test(item.linkUrl)
+                            ? item.linkUrl
+                            : undefined
+                        }
+                        target={/^https?:\/\//i.test(item.linkUrl) ? '_blank' : undefined}
+                        rel="noreferrer"
+                        onClick={(e) => {
+                          if (!/^https?:\/\//i.test(item.linkUrl)) e.preventDefault();
+                        }}
+                      >
+                        {item.linkUrl}
+                      </a>
+                    ) : (
+                      <span className="hero-bg-link-cell is-empty">No link</span>
+                    )}
                   </td>
                   <td>{item.sortOrder}</td>
                   <td>

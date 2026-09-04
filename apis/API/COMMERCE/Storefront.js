@@ -335,11 +335,110 @@ class STOREFRONT {
 
             const InvoiceDocument = require('../../SERVICES/InvoiceDocument');
             const result = await InvoiceDocument.ensurePaidInvoiceDocument(order.orderId);
-            const filename = `${result.invoice.invoice_number || `order-${orderId}`}.html`;
+            const filename = `${result.invoice.invoice_number || `order-${orderId}`}.pdf`;
+            const pdfBuffer = result.pdf || (result.pdf_path
+                ? require('fs').readFileSync(require('path').join(__dirname, '../..', result.pdf_path))
+                : null);
+            if (!pdfBuffer) {
+                return res.status(500).json({ code: 500, message: 'Failed to generate PDF invoice.' });
+            }
 
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-            return res.status(200).send(result.html);
+            res.setHeader('Content-Length', pdfBuffer.length);
+            return res.status(200).send(pdfBuffer);
+        } catch (error) {
+            if (error.status) {
+                return res.status(error.status).json({ code: error.status, message: error.message });
+            }
+            errorLogger(error);
+            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
+        }
+    }
+
+    async lookupInvoice(req, res) {
+        try {
+            const invoiceNumber = req.query.invoice_number || req.query.invoiceNumber || req.body?.invoice_number;
+            const { invoice, order } = await CommerceService.lookupInvoiceByNumber(invoiceNumber);
+
+            const shippingText = [
+                order?.shipping_address?.line1,
+                order?.shipping_address?.line2,
+                order?.shipping_address?.city,
+                order?.shipping_address?.state,
+                order?.shipping_address?.pincode,
+                order?.shipping_address?.country
+            ].filter(Boolean).join(', ');
+
+            return res.status(200).json({
+                ...REQUEST_SUCCESS,
+                message: 'Invoice found.',
+                data: {
+                    invoice_number: invoice.invoice_number,
+                    order_number: invoice.order_number,
+                    payment_status: invoice.payment_status,
+                    created_date: invoice.created_date,
+                    customer: {
+                        name: invoice.customer_details?.name || '',
+                        email: invoice.customer_details?.email || '',
+                        mobile: invoice.customer_details?.mobile || '',
+                        gst_number: invoice.customer_details?.gst_number || '',
+                        billing_address: invoice.customer_details?.billing_address
+                            || invoice.customer_details?.address
+                            || '',
+                        shipping_address: invoice.customer_details?.shipping_address || shippingText
+                    },
+                    items: (invoice.items || []).map((item) => ({
+                        product_name: item.product_name,
+                        sku: item.sku,
+                        hsn_code: item.hsn_code,
+                        quantity: item.quantity,
+                        price: item.price,
+                        tax: item.tax,
+                        gst: item.gst,
+                        total: item.total
+                    })),
+                    subtotal: invoice.subtotal,
+                    tax: invoice.tax,
+                    gst: invoice.gst,
+                    discount: invoice.discount,
+                    grand_total: invoice.grand_total,
+                    can_download: invoice.payment_status === 'received'
+                        || order?.payment_status === 'received'
+                        || order?.payment?.status === 'verified'
+                }
+            });
+        } catch (error) {
+            if (error.status) {
+                return res.status(error.status).json({ code: error.status, message: error.message });
+            }
+            errorLogger(error);
+            return res.status(500).json({ ...INTERNAL_SERVER_ERROR });
+        }
+    }
+
+    async downloadInvoiceByNumber(req, res) {
+        try {
+            const invoiceNumber = req.query.invoice_number || req.query.invoiceNumber || req.body?.invoice_number;
+            const { invoice, order } = await CommerceService.lookupInvoiceByNumber(invoiceNumber);
+            if (!order) {
+                return res.status(404).json({ code: 404, message: 'Order not found for this invoice.' });
+            }
+
+            const InvoiceDocument = require('../../SERVICES/InvoiceDocument');
+            const result = await InvoiceDocument.ensurePaidInvoiceDocument(order.orderId);
+            const filename = `${result.invoice.invoice_number || invoice.invoice_number}.pdf`;
+            const pdfBuffer = result.pdf || (result.pdf_path
+                ? require('fs').readFileSync(require('path').join(__dirname, '../..', result.pdf_path))
+                : null);
+            if (!pdfBuffer) {
+                return res.status(500).json({ code: 500, message: 'Failed to generate PDF invoice.' });
+            }
+
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Length', pdfBuffer.length);
+            return res.status(200).send(pdfBuffer);
         } catch (error) {
             if (error.status) {
                 return res.status(error.status).json({ code: error.status, message: error.message });

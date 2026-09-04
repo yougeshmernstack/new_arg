@@ -17,6 +17,7 @@ module.exports = {
       script: 'app.js',
       env: {
         PORT: 4000,
+        PUPPETEER_CACHE_DIR: path.join(__dirname, 'apis', '.cache', 'puppeteer'),
       },
     },
     {

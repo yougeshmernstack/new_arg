@@ -15,6 +15,7 @@ const Transaction = require('../MODALS/transactions');
 const Action = require('./Activity');
 const { errorLogger } = require('../utils/logger');
 const Email = require('./SendEmail');
+const sms = require('./SmsService');
 
 const FULFILLMENT_STATUSES = [
     'confirmed',
@@ -31,33 +32,70 @@ const ORDER_TYPE_MAP = {
     theme: 'theme_purchase'
 };
 
+function absoluteMediaUrl(pathValue) {
+    if (!pathValue) return null;
+    const raw = String(pathValue).trim();
+    if (!raw) return null;
+    if (/^https?:\/\//i.test(raw) || raw.startsWith('data:')) return raw;
+    const base = String(process.env.API_URL || process.env.BASE_URL || '')
+        .trim()
+        .replace(/\/$/, '');
+    // Snapshot stores path for reference; live render embeds via InvoiceDocument.
+    const pathPart = raw.startsWith('/') ? raw : `/${raw}`;
+    if (base && !/slotegrator|bharatbatteries\.info/i.test(base)) {
+        return `${base}${pathPart}`;
+    }
+    return pathPart;
+}
+
+async function getCompanyGstPercent() {
+    try {
+        const company = await CompanyInfo.findOne({}).lean();
+        const rate = Number(company?.taxInfo?.gst_percent);
+        return Number.isFinite(rate) && rate > 0 ? rate : 0;
+    } catch (_) {
+        return 0;
+    }
+}
+
 async function resolveCompanySnapshot() {
     const company = (await CompanyInfo.findOne({})) || {};
-    let siteName = '';
+    let site = null;
     try {
         const WebsiteContent = require('../MODALS/WebsiteContent');
-        const site = await WebsiteContent.findOne({}).lean();
-        siteName = site?.name || '';
+        site = await WebsiteContent.findOne({}).lean();
     } catch (_) {
-        siteName = '';
+        site = null;
     }
+    const siteName = site?.name || '';
     const rawName = company.companyName || '';
     const name = /bharat\s*batter/i.test(rawName)
         ? (siteName || 'Arogya Green Life')
         : (rawName || siteName || 'Arogya Green Life');
 
+    const structuredAddress = [
+        company.address?.street,
+        company.address?.city,
+        company.address?.state,
+        company.address?.postalCode,
+        company.address?.country
+    ].filter(Boolean).join(', ');
+
+    const websiteRaw = company.contactInfo?.website || site?.contact?.website || '';
+    const website = /bharatbatteries/i.test(websiteRaw)
+        ? (site?.contact?.website || 'https://arogyagreenlife.com')
+        : websiteRaw;
+
     return {
         name,
-        email: company.contactInfo?.email || '',
-        mobile: company.contactInfo?.phone || '',
-        address: [
-            company.address?.street,
-            company.address?.city,
-            company.address?.state,
-            company.address?.postalCode
-        ].filter(Boolean).join(', '),
+        email: company.contactInfo?.email || site?.contact?.email || '',
+        mobile: company.contactInfo?.phone || site?.contact?.phone || '',
+        website,
+        address: structuredAddress || site?.contact?.address || '',
         gst_number: company.taxInfo?.gst || company.taxInfo?.gstin || '',
-        logo: null
+        pan: company.taxInfo?.pan || '',
+        gst_percent: Number(company.taxInfo?.gst_percent) || 0,
+        logo: absoluteMediaUrl(site?.logo || null)
     };
 }
 
@@ -84,6 +122,21 @@ function calcItemTax(price, qty, gst) {
     const base = price * qty;
     const tax = (base * (Number(gst) || 0)) / 100;
     return { base, tax, total: base + tax };
+}
+
+/** Split a GST-inclusive amount into taxable base + tax (package prices are tax-inclusive). */
+function calcInclusiveSplit(inclusiveAmount, gstPercent) {
+    const inclusive = Math.round((Number(inclusiveAmount) || 0) * 100) / 100;
+    const rate = Number(gstPercent) || 0;
+    if (inclusive <= 0) {
+        return { base: 0, tax: 0, total: 0 };
+    }
+    if (rate <= 0) {
+        return { base: inclusive, tax: 0, total: inclusive };
+    }
+    const base = Math.round((inclusive / (1 + rate / 100)) * 100) / 100;
+    const tax = Math.round((inclusive - base) * 100) / 100;
+    return { base, tax, total: inclusive };
 }
 
 class CommerceService {
@@ -332,6 +385,7 @@ class CommerceService {
         let subtotal = 0;
         let taxTotal = 0;
         let orderBv = 0;
+        const companyGstPercent = await getCompanyGstPercent();
 
         try {
             for (const item of cart.items) {
@@ -369,7 +423,8 @@ class CommerceService {
                 decrements.push({ productId: updated.productId, quantity: qty, sku: updated.sku, previous: updated.stock + qty, next: updated.stock });
 
                 const price = priceForRole(updated, role);
-                const { base, tax, total } = calcItemTax(price, qty, updated.gst);
+                const gstRate = companyGstPercent > 0 ? companyGstPercent : (Number(updated.gst) || 0);
+                const { base, tax, total } = calcItemTax(price, qty, gstRate);
                 subtotal += base;
                 taxTotal += tax;
                 if (role === 'distributor') {
@@ -379,9 +434,10 @@ class CommerceService {
                     productId: updated.productId,
                     sku: updated.sku,
                     product_name: updated.product_name,
+                    hsn_code: updated.hsn_code || '',
                     quantity: qty,
                     price,
-                    gst: updated.gst || 0,
+                    gst: gstRate,
                     discount: 0,
                     tax,
                     total
@@ -642,9 +698,9 @@ class CommerceService {
 
         const discountedAmount = Math.max(0, Number(pkg.discounted_amount != null ? pkg.discounted_amount : pkg.price) || 0);
         const listAmount = Math.max(0, Number(pkg.amount) || discountedAmount);
-        const packageDiscount = Math.max(0, listAmount - discountedAmount);
         const packageBv = Math.max(0, Number(pkg.bv) || 0);
         const packagePv = Math.max(0, Number(pkg.pv) || 0);
+        const companyGstPercent = await getCompanyGstPercent();
 
         const decrements = [];
         const orderItems = [];
@@ -704,30 +760,61 @@ class CommerceService {
                     next: updated.stock
                 });
 
-                // Proportional share of package discounted total; no GST on package v1
+                // Package price is GST-inclusive; rate comes from admin company GST %.
                 const share = catalogSubtotal > 0 ? line.base / catalogSubtotal : 1 / lineBases.length;
-                const lineTotal = Math.round(discountedAmount * share * 100) / 100;
-                const unitPrice = Math.round((lineTotal / line.qty) * 100) / 100;
+                const gstRate = companyGstPercent;
+                const payInclusive = Math.round(discountedAmount * share * 100) / 100;
+                const listInclusive = Math.round(listAmount * share * 100) / 100;
+                const paySplit = calcInclusiveSplit(payInclusive, gstRate);
+                const listSplit = calcInclusiveSplit(listInclusive, gstRate);
+                const unitPrice = line.qty > 0
+                    ? Math.round((paySplit.base / line.qty) * 100) / 100
+                    : paySplit.base;
 
                 orderItems.push({
                     productId: updated.productId,
                     sku: updated.sku,
                     product_name: updated.product_name,
+                    hsn_code: updated.hsn_code || '',
                     quantity: line.qty,
                     price: unitPrice,
-                    gst: 0,
+                    gst: gstRate,
                     discount: 0,
-                    tax: 0,
-                    total: lineTotal
+                    tax: paySplit.tax,
+                    total: paySplit.total,
+                    _listBase: listSplit.base,
+                    _payBase: paySplit.base
                 });
             }
 
-            // Fix rounding so line totals sum to discountedAmount
+            // Fix rounding so inclusive line totals sum to discountedAmount
             const itemsSum = orderItems.reduce((s, i) => s + i.total, 0);
             const diff = Math.round((discountedAmount - itemsSum) * 100) / 100;
             if (orderItems.length && diff !== 0) {
-                orderItems[orderItems.length - 1].total =
-                    Math.round((orderItems[orderItems.length - 1].total + diff) * 100) / 100;
+                const last = orderItems[orderItems.length - 1];
+                last.total = Math.round((last.total + diff) * 100) / 100;
+                const reSplit = calcInclusiveSplit(last.total, last.gst);
+                last.tax = reSplit.tax;
+                last._payBase = reSplit.base;
+                last.price = last.quantity > 0
+                    ? Math.round((reSplit.base / last.quantity) * 100) / 100
+                    : reSplit.base;
+            }
+
+            const taxableSubtotal = Math.round(
+                orderItems.reduce((s, i) => s + (Number(i._listBase) || 0), 0) * 100
+            ) / 100;
+            const taxablePay = Math.round(
+                orderItems.reduce((s, i) => s + (Number(i._payBase) || 0), 0) * 100
+            ) / 100;
+            const taxTotal = Math.round(
+                orderItems.reduce((s, i) => s + (Number(i.tax) || 0), 0) * 100
+            ) / 100;
+            const exclusiveDiscount = Math.max(0, Math.round((taxableSubtotal - taxablePay) * 100) / 100);
+
+            for (const item of orderItems) {
+                delete item._listBase;
+                delete item._payBase;
             }
 
             const order = new CommerceOrder({
@@ -741,9 +828,9 @@ class CommerceService {
                 bv: packageBv,
                 pv: packagePv,
                 items: orderItems,
-                subtotal: listAmount,
-                discount: packageDiscount,
-                tax: 0,
+                subtotal: taxableSubtotal,
+                discount: exclusiveDiscount,
+                tax: taxTotal,
                 grand_total: discountedAmount,
                 payment_status: 'pending',
                 payment: defaultManualPayment(),
@@ -793,10 +880,10 @@ class CommerceService {
                 },
                 company_details: companyDetails,
                 items: orderItems,
-                subtotal: listAmount,
-                discount: packageDiscount,
-                tax: 0,
-                gst: 0,
+                subtotal: taxableSubtotal,
+                discount: exclusiveDiscount,
+                tax: taxTotal,
+                gst: taxTotal,
                 grand_total: discountedAmount,
                 payment_status: 'pending',
                 dispatch_status: 'pending'
@@ -1099,6 +1186,19 @@ class CommerceService {
                 } catch (mailErr) {
                     errorLogger(mailErr);
                 }
+                try {
+                    const mobile = invoice?.customer_details?.mobile;
+                    if (mobile) {
+                        const name = invoice.customer_details?.name || '';
+                        const amount = invoice.grand_total ?? order.grand_total;
+                        const orderRef = order.order_number || order.orderId;
+                        const paidAt = order?.payment?.verified_at || new Date();
+                        await sms.paymentSms(mobile, name, amount, orderRef);
+                        await sms.invoiceSms(mobile, invoice.invoice_number, sms.formatDate(paidAt));
+                    }
+                } catch (smsErr) {
+                    errorLogger(smsErr);
+                }
             } catch (docErr) {
                 // Payment verify must not fail if document render has an issue
                 console.error('Invoice document generation failed:', docErr.message || docErr);
@@ -1319,6 +1419,355 @@ class CommerceService {
 
         order.franchise_stock_credited = false;
         return { debited: true };
+    }
+
+    formatAddressBlock(addr = {}) {
+        return [
+            addr.line1,
+            addr.line2,
+            addr.city,
+            addr.state,
+            addr.pincode,
+            addr.country
+        ].filter(Boolean).join(', ');
+    }
+
+    normalizeAddress(input = {}, fallbackName = '', fallbackMobile = '') {
+        return {
+            name: String(input.name || fallbackName || '').trim(),
+            mobile: String(input.mobile || fallbackMobile || '').trim(),
+            line1: String(input.line1 || '').trim(),
+            line2: String(input.line2 || '').trim(),
+            city: String(input.city || '').trim(),
+            state: String(input.state || '').trim(),
+            pincode: String(input.pincode || '').trim(),
+            country: String(input.country || 'India').trim() || 'India'
+        };
+    }
+
+    /**
+     * Admin creates a guest invoice (no username / account required).
+     * Supports catalog products and/or custom line items.
+     * Marks payment received and generates PDF immediately.
+     */
+    async createGuestInvoice({
+        adminUser,
+        customer = {},
+        billing_address = {},
+        shipping_address = {},
+        items = [],
+        remark = '',
+        deduct_stock = true
+    }) {
+        const name = String(customer.name || billing_address.name || shipping_address.name || '').trim();
+        if (!name) {
+            const err = new Error('Customer name is required.');
+            err.status = 400;
+            throw err;
+        }
+
+        const rawItems = Array.isArray(items) ? items : [];
+        if (!rawItems.length) {
+            const err = new Error('At least one invoice item is required.');
+            err.status = 400;
+            throw err;
+        }
+
+        const companyGstPercent = await getCompanyGstPercent();
+        const decrements = [];
+        const orderItems = [];
+        let subtotal = 0;
+        let taxTotal = 0;
+        let discountTotal = 0;
+
+        try {
+            for (const raw of rawItems) {
+                const qty = Math.max(0, Math.floor(Number(raw.quantity) || 0));
+                if (qty <= 0) {
+                    const err = new Error('Each item needs a quantity greater than 0.');
+                    err.status = 400;
+                    throw err;
+                }
+
+                const productId = Number(raw.productId) || 0;
+                let product = null;
+
+                if (productId > 0) {
+                    if (deduct_stock) {
+                        product = await Product.findOneAndUpdate(
+                            {
+                                productId,
+                                status: 'enabled',
+                                stock: { $gte: qty }
+                            },
+                            { $inc: { stock: -qty }, $set: { updated_at: new Date() } },
+                            { new: true }
+                        );
+                        if (!product) {
+                            const current = await Product.findOne({ productId });
+                            const available = current ? current.stock : 0;
+                            const pname = current?.product_name || `Product #${productId}`;
+                            const err = new Error(
+                                current
+                                    ? `Insufficient stock for ${pname}. Available: ${available}.`
+                                    : `Product #${productId} not found.`
+                            );
+                            err.status = 409;
+                            throw err;
+                        }
+                        decrements.push({
+                            productId: product.productId,
+                            quantity: qty,
+                            sku: product.sku,
+                            previous: product.stock + qty,
+                            next: product.stock
+                        });
+                    } else {
+                        product = await Product.findOne({ productId, status: 'enabled' });
+                        if (!product) {
+                            const err = new Error(`Product #${productId} not found.`);
+                            err.status = 404;
+                            throw err;
+                        }
+                    }
+                }
+
+                const listUnit = Number(
+                    raw.price !== undefined && raw.price !== ''
+                        ? raw.price
+                        : (product ? product.mrp : 0)
+                );
+                if (!Number.isFinite(listUnit) || listUnit < 0) {
+                    const err = new Error('Invalid item price.');
+                    err.status = 400;
+                    throw err;
+                }
+
+                const productName = String(
+                    raw.product_name || product?.product_name || ''
+                ).trim();
+                if (!productName) {
+                    const err = new Error('Item name is required for custom line items.');
+                    err.status = 400;
+                    throw err;
+                }
+
+                const gstRate = companyGstPercent > 0
+                    ? companyGstPercent
+                    : (Number(raw.gst) || Number(product?.gst) || 0);
+
+                // Admin guest purchase: 20% off MRP; discounted amount is GST-inclusive.
+                const GUEST_DISCOUNT_PERCENT = 20;
+                const listInclusive = Math.round(listUnit * qty * 100) / 100;
+                const payInclusive = Math.round(listInclusive * (1 - GUEST_DISCOUNT_PERCENT / 100) * 100) / 100;
+                const listSplit = calcInclusiveSplit(listInclusive, gstRate);
+                const paySplit = calcInclusiveSplit(payInclusive, gstRate);
+                const unitPrice = qty > 0
+                    ? Math.round((paySplit.base / qty) * 100) / 100
+                    : paySplit.base;
+                const lineDiscount = Math.max(
+                    0,
+                    Math.round((listSplit.base - paySplit.base) * 100) / 100
+                );
+
+                subtotal += listSplit.base;
+                taxTotal += paySplit.tax;
+                discountTotal += lineDiscount;
+
+                orderItems.push({
+                    productId: productId || 0,
+                    sku: String(raw.sku || product?.sku || 'CUSTOM').trim() || 'CUSTOM',
+                    product_name: productName,
+                    hsn_code: String(raw.hsn_code || product?.hsn_code || '').trim(),
+                    quantity: qty,
+                    price: unitPrice,
+                    gst: gstRate,
+                    discount: lineDiscount,
+                    tax: paySplit.tax,
+                    total: paySplit.total
+                });
+            }
+
+            // Fix rounding so inclusive line totals match 20% off list totals
+            const expectedGrand = Math.round(
+                orderItems.reduce((s, i) => s + Number(i.total || 0), 0) * 100
+            ) / 100;
+
+            const email = String(customer.email || '').trim();
+            const mobile = String(
+                customer.mobile || billing_address.mobile || shipping_address.mobile || ''
+            ).trim();
+            const gstNumber = String(customer.gst_number || '').trim();
+
+            const billing = this.normalizeAddress(billing_address, name, mobile);
+            const shipping = this.normalizeAddress(
+                shipping_address,
+                billing.name || name,
+                billing.mobile || mobile
+            );
+            if (!shipping.line1 && billing.line1) {
+                Object.assign(shipping, {
+                    line1: billing.line1,
+                    line2: billing.line2,
+                    city: billing.city,
+                    state: billing.state,
+                    pincode: billing.pincode,
+                    country: billing.country
+                });
+            }
+
+            const billingText = this.formatAddressBlock(billing);
+            const shippingText = this.formatAddressBlock(shipping);
+            const roundedSubtotal = Math.round(subtotal * 100) / 100;
+            const roundedDiscount = Math.round(discountTotal * 100) / 100;
+            const roundedTax = Math.round(taxTotal * 100) / 100;
+            const grand_total = expectedGrand;
+            const adminUid = adminUser?.uid || null;
+
+            const order = new CommerceOrder({
+                order_type: 'guest_purchase',
+                buyer_uid: 0,
+                buyer_role: 'guest',
+                items: orderItems,
+                subtotal: roundedSubtotal,
+                discount: roundedDiscount,
+                tax: roundedTax,
+                grand_total,
+                bv: 0,
+                payment_status: 'received',
+                payment: {
+                    mode: 'manual',
+                    utr: String(customer.payment_ref || '').trim(),
+                    proofUrl: '',
+                    submitted_at: new Date(),
+                    status: 'verified',
+                    verified_by: adminUid,
+                    verified_at: new Date(),
+                    remark: remark || 'Guest invoice created by admin (20% off, GST inclusive)'
+                },
+                order_status: 'confirmed',
+                dispatch_status: 'pending',
+                shipping_address: shipping,
+                billing_address: billing,
+                timeline: [{
+                    status: 'confirmed',
+                    remark: remark || 'Guest invoice generated by admin — 20% discount, GST inclusive, payment marked received',
+                    updated_by: adminUid,
+                    updated_by_role: adminUser?.role || 'admin',
+                    updated_by_name: adminUser?.username || 'Admin',
+                    updated_at: new Date()
+                }]
+            });
+            await order.save();
+
+            const companyDetails = await resolveCompanySnapshot();
+            const invoice = new Invoice({
+                orderId: order.orderId,
+                order_number: order.order_number,
+                customer_uid: 0,
+                customer_role: 'guest',
+                customer_details: {
+                    name,
+                    email,
+                    mobile,
+                    address: billingText || shippingText,
+                    billing_address: billingText,
+                    shipping_address: shippingText,
+                    gst_number: gstNumber
+                },
+                company_details: companyDetails,
+                items: orderItems,
+                subtotal: order.subtotal,
+                discount: order.discount,
+                tax: order.tax,
+                gst: order.tax,
+                grand_total: order.grand_total,
+                payment_status: 'received',
+                dispatch_status: 'pending'
+            });
+            await invoice.save();
+
+            order.invoice_number = invoice.invoice_number;
+            await order.save();
+
+            for (const d of decrements) {
+                await new StockHistory({
+                    scope: 'admin',
+                    productId: d.productId,
+                    sku: d.sku,
+                    action: 'order',
+                    quantity: d.quantity,
+                    previous_available: d.previous,
+                    new_available: d.next,
+                    reference_type: 'order',
+                    reference_id: order.order_number,
+                    remark: `Guest invoice ${invoice.invoice_number}`,
+                    created_by: adminUid
+                }).save();
+            }
+
+            try {
+                const InvoiceDocument = require('./InvoiceDocument');
+                await InvoiceDocument.generateInvoiceDocument({ invoice, order });
+            } catch (docErr) {
+                console.error('Guest invoice PDF generation failed:', docErr.message || docErr);
+            }
+
+            try {
+                if (email) {
+                    await Email.sendInvoiceEmail({
+                        email,
+                        name,
+                        order,
+                        invoice
+                    });
+                }
+            } catch (mailErr) {
+                errorLogger(mailErr);
+            }
+
+            try {
+                if (mobile) {
+                    const orderRef = order.order_number || order.orderId;
+                    await sms.paymentSms(mobile, name, order.grand_total, orderRef);
+                    await sms.invoiceSms(mobile, invoice.invoice_number, sms.formatDate(new Date()));
+                }
+            } catch (smsErr) {
+                errorLogger(smsErr);
+            }
+
+            return { order, invoice };
+        } catch (error) {
+            if (decrements.length) {
+                try {
+                    await this.rollbackStock(decrements);
+                } catch (rbErr) {
+                    errorLogger(rbErr);
+                }
+            }
+            throw error;
+        }
+    }
+
+    async lookupInvoiceByNumber(invoiceNumber) {
+        const number = String(invoiceNumber || '').trim().toUpperCase();
+        if (!number) {
+            const err = new Error('Invoice number is required.');
+            err.status = 400;
+            throw err;
+        }
+
+        const invoice = await Invoice.findOne({
+            invoice_number: { $regex: new RegExp(`^${number.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+        });
+        if (!invoice) {
+            const err = new Error('Invoice not found.');
+            err.status = 404;
+            throw err;
+        }
+
+        const order = await CommerceOrder.findOne({ orderId: invoice.orderId });
+        return { invoice, order };
     }
 }
 

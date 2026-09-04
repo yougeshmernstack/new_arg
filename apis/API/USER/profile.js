@@ -6,6 +6,7 @@ const UserPaymentOption = require("../../MODALS/UserPaymentOption");
 const UserWallet = require("../../MODALS/userWallets");
 
 const Email = require("../../SERVICES/SendEmail");
+const sms = require("../../SERVICES/SmsService");
 const Team = require("../../SERVICES/UpdateTeam");
 const { INVALID_CREDENTIALS, PANCARD_ALREADY_EXISTS, INTERNAL_SERVER_ERROR, USERNAME_ALREADY_EXISTS, INVALID_USERNAME, SPONSOR_NOT_ACTIVE ,BLOCK_USER } = require("../../utils/errorMessages");
 const form_validator = require("../../utils/form-validators");
@@ -95,8 +96,16 @@ class PROFILE {
             await UserData.updateOne({ uid: User.uid }, { $set: { lastActivity: new Date() } });
 
             res.status(200).json({ ...registrationSuccess, token, User });
-            req.welcome = { email: User.email, name: User.name, username: User.username, password: password }
+            const plainPassword = isStrongPassword.password || password;
+            req.welcome = { email: User.email, name: User.name, username: User.username, password: plainPassword }
             send_email == 1 && await Email.sendWelcomeEmail(req, res, () => { });
+            if (User.mobile && plainPassword) {
+                try {
+                    await sms.usernameSms(User.mobile, User.username, plainPassword);
+                } catch (smsErr) {
+                    errorLogger(smsErr);
+                }
+            }
             return;
         } catch (error) {
             errorLogger(error)

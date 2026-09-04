@@ -7,6 +7,7 @@ import Dashboard from '../pages/dashboard/Dashboard';
 import Franchises from '../pages/franchises/Franchises';
 import CreateFranchise from '../pages/franchises/CreateFranchise';
 import Distributors from '../pages/distributors/Distributors';
+import ThemeUsers from '../pages/themeUsers/ThemeUsers';
 import AuditLogs from '../pages/audit/AuditLogs';
 import Products from '../pages/products/Products';
 import CreateProduct from '../pages/products/CreateProduct';
@@ -18,6 +19,7 @@ import CreatePackage from '../pages/packages/CreatePackage';
 import EditPackage from '../pages/packages/EditPackage';
 import Orders from '../pages/orders/Orders';
 import OrderDetail from '../pages/orders/OrderDetail';
+import CreateGuestInvoice from '../pages/orders/CreateGuestInvoice';
 import PaymentSettings from '../pages/payments/PaymentSettings';
 import FundDeposits from '../pages/payments/FundDeposits';
 import FundDepositHistory from '../pages/payments/FundDepositHistory';
@@ -27,7 +29,10 @@ import GrantDummyBusiness from '../pages/team/GrantDummyBusiness';
 import DummyBusinessHistory from '../pages/team/DummyBusinessHistory';
 import CompanyBrand from '../pages/website/CompanyBrand';
 import HeroBackground from '../pages/website/HeroBackground';
+import HomepageStory from '../pages/website/HomepageStory';
+import SocialMedia from '../pages/website/SocialMedia';
 import AboutFounders from '../pages/website/AboutFounders';
+import ReviewsTestimonials from '../pages/website/ReviewsTestimonials';
 import LegalDocuments from '../pages/website/LegalDocuments';
 import DashboardBanners from '../pages/website/DashboardBanners';
 import KycRequests from '../pages/kyc/KycRequests';
@@ -47,6 +52,7 @@ export default function AppRoutes() {
             <Route path="franchises" element={<Franchises />} />
             <Route path="franchises/create" element={<CreateFranchise />} />
             <Route path="distributors" element={<Distributors />} />
+            <Route path="theme-users" element={<ThemeUsers />} />
             <Route path="kyc" element={<KycRequests />} />
             <Route path="products" element={<Products />} />
             <Route path="products/create" element={<CreateProduct />} />
@@ -60,6 +66,8 @@ export default function AppRoutes() {
             <Route path="orders/franchise" element={<Orders buyerRole="franchise" />} />
             <Route path="orders/distributor" element={<Orders buyerRole="distributor" />} />
             <Route path="orders/theme" element={<Orders buyerRole="theme" />} />
+            <Route path="orders/guest" element={<Orders buyerRole="guest" />} />
+            <Route path="orders/guest/create" element={<CreateGuestInvoice />} />
             <Route path="orders/:orderId" element={<OrderDetail />} />
 
             <Route path="payment-settings" element={<PaymentSettings />} />
@@ -77,7 +85,10 @@ export default function AppRoutes() {
             <Route path="traveling-achievements" element={<RankAchievementList type="traveling" />} />
             <Route path="website/company" element={<CompanyBrand />} />
             <Route path="website/hero" element={<HeroBackground />} />
+            <Route path="website/home-story" element={<HomepageStory />} />
+            <Route path="website/social" element={<SocialMedia />} />
             <Route path="website/about" element={<AboutFounders />} />
+            <Route path="website/reviews" element={<ReviewsTestimonials />} />
             <Route path="website/legal" element={<LegalDocuments />} />
             <Route path="website/banners" element={<DashboardBanners />} />
             <Route path="audit-logs" element={<AuditLogs />} />

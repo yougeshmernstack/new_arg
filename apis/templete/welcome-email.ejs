@@ -3,44 +3,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
   <title>Welcome to Arogya Green Life</title>
 </head>
-<body style="margin:0;padding:0;background:#e2e8f0;font-family:Arial,Helvetica,sans-serif;color:#111827;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#e2e8f0;padding:24px 12px;">
+<body style="margin:0;padding:0;background:#f3f5f4;font-family:Arial,Helvetica,sans-serif;color:#1a2e24;-webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f5f4;padding:32px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #94a3b8;">
+        <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;width:100%;background:#ffffff;border-collapse:collapse;">
+
+          <% var headerTitle = 'Welcome'; %>
+          <%- include('partials/email-header') %>
+
           <tr>
-            <td style="padding:20px 24px;border-bottom:3px solid #0f766e;">
-              <p style="margin:0;font-size:20px;font-weight:800;color:#0f766e;">Arogya Green Life</p>
-              <p style="margin:6px 0 0;font-size:13px;color:#4b5563;">Welcome aboard</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px;">
-              <p style="margin:0 0 12px;font-size:16px;">Hello <%= name || username %>,</p>
-              <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#374151;">
-                Your <%= role || 'member' %> account has been created successfully. Keep these login details safe.
+            <td style="padding:28px 32px 8px;">
+              <p style="margin:0 0 12px;font-size:18px;font-weight:700;color:#1a2e24;">
+                Hello <%= name || username %>,
               </p>
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ecfdf5;border:1px solid #99f6e4;">
+              <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4a5c52;">
+                Your <%= role || 'member' %> account has been created successfully on Arogya Green Life.
+                Please keep the details below safe.
+              </p>
+
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border-top:1px solid #e5ebe7;border-bottom:1px solid #e5ebe7;">
                 <tr>
-                  <td style="padding:14px 16px;font-size:14px;line-height:1.7;">
-                    <strong>Username:</strong> <%= username %><br />
-                    <strong>Password:</strong> <%= password %><br />
-                    <strong>Email:</strong> <%= email %>
+                  <td style="padding:14px 0;width:120px;font-size:13px;color:#6b7c72;vertical-align:top;">Username</td>
+                  <td style="padding:14px 0;font-size:15px;font-weight:700;color:#1a2e24;vertical-align:top;"><%= username %></td>
+                </tr>
+                <tr>
+                  <td style="padding:14px 0;border-top:1px solid #eef2f0;width:120px;font-size:13px;color:#6b7c72;vertical-align:top;">Password</td>
+                  <td style="padding:14px 0;border-top:1px solid #eef2f0;font-size:15px;font-weight:700;color:#1a2e24;vertical-align:top;"><%= password %></td>
+                </tr>
+                <tr>
+                  <td style="padding:14px 0;border-top:1px solid #eef2f0;width:120px;font-size:13px;color:#6b7c72;vertical-align:top;">Email</td>
+                  <td style="padding:14px 0;border-top:1px solid #eef2f0;font-size:15px;font-weight:700;color:#1a2e24;vertical-align:top;">
+                    <a href="mailto:<%= email %>" style="color:#1b5e3b;text-decoration:none;"><%= email %></a>
                   </td>
                 </tr>
               </table>
-              <p style="margin:16px 0 0;font-size:13px;color:#4b5563;line-height:1.5;">
-                For security, please change your password after your first login.
+
+              <p style="margin:22px 0 0;font-size:13px;line-height:1.55;color:#6b7c72;">
+                For security, change your password after the first login.
               </p>
             </td>
           </tr>
+
           <tr>
-            <td style="padding:14px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">
-              &copy; Arogya Green Life. This is an automated message.
+            <td style="padding:24px 32px 28px;">
+              <p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:#4a5c52;">
+                Need help?
+                <a href="mailto:info@arogyagreenlife.com" style="color:#1b5e3b;text-decoration:none;font-weight:700;">info@arogyagreenlife.com</a>
+              </p>
+              <%- include('partials/social-footer') %>
+              <p style="margin:16px 0 0;font-size:12px;line-height:1.5;color:#8a9a91;">
+                &copy; Arogya Green Life<br />
+                This is an automated message. Do not share your password.
+              </p>
             </td>
           </tr>
+
         </table>
       </td>
     </tr>

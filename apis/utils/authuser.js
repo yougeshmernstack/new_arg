@@ -59,6 +59,11 @@ class Authenticator {
 
 async authenticateToken(req, res, next, route_For) {
     try {
+        // Public auth endpoints — no token / permission row required
+        if (req.path === '/login' && req.method === 'POST') {
+            return next();
+        }
+
         // Special case for OTP (bypass authentication)
         if (req.path === '/send-otp' && req.body.action === 'forgot_password') {
             return next();

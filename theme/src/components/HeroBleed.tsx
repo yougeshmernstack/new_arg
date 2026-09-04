@@ -2,12 +2,36 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { NatureAmbient } from '@/components/NatureAmbient';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type TouchEvent,
+} from 'react';
 import type { HeroSlide } from '@/lib/siteContent';
 
-const HERO_INTERVAL_MS = 1500;
+const HERO_INTERVAL_MS = 5500;
 const SWIPE_THRESHOLD_PX = 48;
+
+/** Gen-Z transition pack — cycles so each change feels different */
+const FX = ['blinds', 'slices', 'tiles', 'swipe', 'zoom'] as const;
+type HeroFx = (typeof FX)[number];
+
+const FX_MS: Record<HeroFx, number> = {
+  blinds: 1850,
+  slices: 1750,
+  tiles: 1950,
+  swipe: 1450,
+  zoom: 1550,
+};
+
+const STRIP_COUNT = 12;
+const SLICE_COUNT = 8;
+const TILE_COLS = 6;
+const TILE_ROWS = 4;
 
 type HeroBleedProps = {
   brandName: string;
@@ -17,32 +41,170 @@ type HeroBleedProps = {
   slides?: HeroSlide[];
 };
 
-function splitBrand(name: string) {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return {
-      primary: parts[0],
-      secondary: parts.slice(1).join(' '),
-    };
-  }
-  return { primary: name, secondary: '' };
-}
-
 function isExternalUrl(url: string) {
   return /^https?:\/\//i.test(url);
 }
 
+function prefersReducedMotion() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function SlideImage({
+  slide,
+  priority = false,
+  className = 'hero-media-img',
+}: {
+  slide: HeroSlide;
+  priority?: boolean;
+  className?: string;
+}) {
+  return (
+    <Image
+      src={slide.imageUrl}
+      alt={slide.title || 'Hero banner'}
+      fill
+      priority={priority}
+      className={className}
+      unoptimized={slide.imageUrl.startsWith('http')}
+      sizes="100vw"
+      draggable={false}
+    />
+  );
+}
+
+function SlideLink({
+  slide,
+  children,
+  className = 'hero-slide-link',
+}: {
+  slide: HeroSlide;
+  children: ReactNode;
+  className?: string;
+}) {
+  if (!slide.linkUrl) return <>{children}</>;
+
+  if (isExternalUrl(slide.linkUrl)) {
+    return (
+      <a className={className} href={slide.linkUrl} target="_blank" rel="noreferrer">
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <Link className={className} href={slide.linkUrl}>
+      {children}
+    </Link>
+  );
+}
+
+function FxOverlay({ slide, fx }: { slide: HeroSlide; fx: HeroFx }) {
+  if (fx === 'blinds') {
+    return (
+      <div className="hero-fx hero-fx-blinds is-run" aria-hidden="true">
+        {Array.from({ length: STRIP_COUNT }, (_, i) => (
+          <div
+            key={`b-${i}`}
+            className="hero-fx-cell"
+            style={{ '--i': i, '--n': STRIP_COUNT } as CSSProperties}
+          >
+            <div className="hero-fx-pane hero-fx-pane-x">
+              <SlideImage slide={slide} className="hero-media-img hero-fx-img" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (fx === 'slices') {
+    return (
+      <div className="hero-fx hero-fx-slices is-run" aria-hidden="true">
+        {Array.from({ length: SLICE_COUNT }, (_, i) => (
+          <div
+            key={`s-${i}`}
+            className="hero-fx-row"
+            style={{ '--i': i, '--n': SLICE_COUNT } as CSSProperties}
+          >
+            <div className="hero-fx-pane hero-fx-pane-y">
+              <SlideImage slide={slide} className="hero-media-img hero-fx-img" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (fx === 'tiles') {
+    const total = TILE_COLS * TILE_ROWS;
+    return (
+      <div
+        className="hero-fx hero-fx-tiles is-run"
+        style={{ '--cols': TILE_COLS, '--rows': TILE_ROWS } as CSSProperties}
+        aria-hidden="true"
+      >
+        {Array.from({ length: total }, (_, i) => {
+          const col = i % TILE_COLS;
+          const row = Math.floor(i / TILE_COLS);
+          return (
+            <div
+              key={`t-${i}`}
+              className="hero-fx-tile"
+              style={
+                {
+                  '--i': i,
+                  '--col': col,
+                  '--row': row,
+                  '--cols': TILE_COLS,
+                  '--rows': TILE_ROWS,
+                } as CSSProperties
+              }
+            >
+              <div className="hero-fx-pane hero-fx-pane-tile">
+                <SlideImage slide={slide} className="hero-media-img hero-fx-img" />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (fx === 'swipe') {
+    return (
+      <div className="hero-fx hero-fx-swipe is-run" aria-hidden="true">
+        <div className="hero-fx-swipe-sheet">
+          <SlideImage slide={slide} className="hero-media-img hero-fx-img" />
+        </div>
+      </div>
+    );
+  }
+
+  // zoom + soft flash
+  return (
+    <div className="hero-fx hero-fx-zoom is-run" aria-hidden="true">
+      <div className="hero-fx-zoom-sheet">
+        <SlideImage slide={slide} className="hero-media-img hero-fx-img" />
+      </div>
+      <span className="hero-fx-flash" />
+    </div>
+  );
+}
+
 export function HeroBleed({ brandName, slogan, lede, heroSrc, slides }: HeroBleedProps) {
-  const mediaRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const touchStartX = useRef<number | null>(null);
-  const pauseUntilRef = useRef(0);
-  // Kept for feature re-enable (hero brand copy box below)
-  const { primary, secondary } = splitBrand(brandName);
-  void primary;
-  void secondary;
+  void brandName;
   void slogan;
   void lede;
+
+  const mediaRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
+  const pauseUntilRef = useRef(0);
+  const lockRef = useRef(false);
+  const activeIndexRef = useRef(0);
+  const fxIndexRef = useRef(0);
+  const autoplayTimerRef = useRef<number | null>(null);
+  const unlockTimerRef = useRef<number | null>(null);
 
   const slideList: HeroSlide[] =
     slides && slides.length > 0
@@ -52,108 +214,137 @@ export function HeroBleed({ brandName, slogan, lede, heroSrc, slides }: HeroBlee
         : [];
 
   const count = slideList.length;
-  const [index, setIndex] = useState(0);
-  const [animate, setAnimate] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
+  const [phase, setPhase] = useState<'idle' | 'out'>('idle');
+  const [activeFx, setActiveFx] = useState<HeroFx>('blinds');
+  const [incomingFx, setIncomingFx] = useState<HeroFx>('blinds');
 
-  useEffect(() => {
-    setIndex(0);
-    setAnimate(true);
-  }, [count]);
+  activeIndexRef.current = activeIndex;
 
-  useEffect(() => {
-    const media = mediaRef.current;
-    if (!media) return;
+  const clearUnlockTimer = useCallback(() => {
+    if (unlockTimerRef.current != null) {
+      window.clearTimeout(unlockTimerRef.current);
+      unlockTimerRef.current = null;
+    }
+  }, []);
 
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) return;
-
-    const onScroll = () => {
-      const y = Math.min(window.scrollY, 420);
-      media.style.transform = `translate3d(0, ${y * 0.18}px, 0) scale(${1.04 + y * 0.00012})`;
-    };
-
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+  const clearAutoplayTimer = useCallback(() => {
+    if (autoplayTimerRef.current != null) {
+      window.clearTimeout(autoplayTimerRef.current);
+      autoplayTimerRef.current = null;
+    }
   }, []);
 
   const pauseAutoplay = useCallback(() => {
     pauseUntilRef.current = Date.now() + HERO_INTERVAL_MS * 2;
   }, []);
 
-  const goTo = useCallback(
-    (next: number, manual = false) => {
-      if (count <= 1) return;
-      setAnimate(true);
-      setIndex(next);
+  const finishTransition = useCallback(() => {
+    clearUnlockTimer();
+    setOutgoingIndex(null);
+    setPhase('idle');
+    lockRef.current = false;
+  }, [clearUnlockTimer]);
+
+  const nextFx = useCallback(() => {
+    const fx = FX[fxIndexRef.current % FX.length];
+    fxIndexRef.current += 1;
+    return fx;
+  }, []);
+
+  const changeTo = useCallback(
+    (nextIndex: number, manual = false) => {
+      if (count <= 1 || lockRef.current) return false;
+      const next = ((nextIndex % count) + count) % count;
+      const current = activeIndexRef.current;
+      if (next === current) return false;
+
       if (manual) pauseAutoplay();
+
+      if (prefersReducedMotion()) {
+        setActiveIndex(next);
+        setOutgoingIndex(null);
+        setPhase('idle');
+        return true;
+      }
+
+      const fx = nextFx();
+      lockRef.current = true;
+      clearUnlockTimer();
+      setActiveFx(fx);
+      setIncomingFx(fx);
+      setOutgoingIndex(current);
+      setActiveIndex(next);
+      setPhase('out');
+
+      unlockTimerRef.current = window.setTimeout(() => {
+        finishTransition();
+      }, FX_MS[fx]);
+
+      return true;
     },
-    [count, pauseAutoplay],
+    [clearUnlockTimer, count, finishTransition, nextFx, pauseAutoplay],
   );
 
   const manualNext = useCallback(() => {
-    if (count <= 1) return;
-    setAnimate(true);
-    setIndex((prev) => {
-      const visual = ((prev % count) + count) % count;
-      return visual + 1;
-    });
-    pauseAutoplay();
-  }, [count, pauseAutoplay]);
+    changeTo(activeIndexRef.current + 1, true);
+  }, [changeTo]);
 
   const manualPrev = useCallback(() => {
-    if (count <= 1) return;
-    setAnimate(true);
-    setIndex((prev) => {
-      const visual = ((prev % count) + count) % count;
-      return visual - 1;
-    });
-    pauseAutoplay();
-  }, [count, pauseAutoplay]);
+    changeTo(activeIndexRef.current - 1, true);
+  }, [changeTo]);
 
-  // Autoplay: advance so slides move right → left
+  const goTo = useCallback(
+    (target: number) => {
+      changeTo(target, true);
+    },
+    [changeTo],
+  );
+
   useEffect(() => {
-    if (count <= 1) return undefined;
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) return undefined;
-
-    const timer = window.setInterval(() => {
-      if (Date.now() < pauseUntilRef.current) return;
-      setAnimate(true);
-      setIndex((prev) => (prev >= count ? prev : prev + 1));
-    }, HERO_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [count]);
+    setActiveIndex(0);
+    setOutgoingIndex(null);
+    setPhase('idle');
+    lockRef.current = false;
+    fxIndexRef.current = 0;
+    clearUnlockTimer();
+    clearAutoplayTimer();
+  }, [count, clearAutoplayTimer, clearUnlockTimer]);
 
   useEffect(() => {
     if (count <= 1) return undefined;
-    const track = trackRef.current;
-    if (!track) return undefined;
 
-    const onEnd = (event: TransitionEvent) => {
-      if (event.target !== track) return;
-      if (index >= count) {
-        setAnimate(false);
-        setIndex(0);
-      } else if (index < 0) {
-        setAnimate(false);
-        setIndex(count - 1);
-      }
+    const tick = (wait = HERO_INTERVAL_MS) => {
+      clearAutoplayTimer();
+      autoplayTimerRef.current = window.setTimeout(() => {
+        if (Date.now() < pauseUntilRef.current || lockRef.current) {
+          tick(300);
+          return;
+        }
+        changeTo(activeIndexRef.current + 1);
+        tick(HERO_INTERVAL_MS);
+      }, wait);
     };
 
-    track.addEventListener('transitionend', onEnd);
-    return () => track.removeEventListener('transitionend', onEnd);
-  }, [index, count]);
+    tick(HERO_INTERVAL_MS);
+    return () => clearAutoplayTimer();
+  }, [changeTo, clearAutoplayTimer, count]);
+
+  useEffect(
+    () => () => {
+      clearAutoplayTimer();
+      clearUnlockTimer();
+    },
+    [clearAutoplayTimer, clearUnlockTimer],
+  );
 
   useEffect(() => {
-    if (animate) return undefined;
-    const id = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => setAnimate(true));
-    });
-    return () => window.cancelAnimationFrame(id);
-  }, [animate, index]);
+    const media = mediaRef.current;
+    if (!media) return;
+    media.style.transform = '';
+  }, []);
 
-  // Keyboard ← →
   useEffect(() => {
     if (count <= 1) return undefined;
     const onKey = (event: KeyboardEvent) => {
@@ -171,11 +362,11 @@ export function HeroBleed({ brandName, slogan, lede, heroSrc, slides }: HeroBlee
     return () => window.removeEventListener('keydown', onKey);
   }, [count, manualNext, manualPrev]);
 
-  const onTouchStart = (event: React.TouchEvent) => {
+  const onTouchStart = (event: TouchEvent) => {
     touchStartX.current = event.changedTouches[0]?.clientX ?? null;
   };
 
-  const onTouchEnd = (event: React.TouchEvent) => {
+  const onTouchEnd = (event: TouchEvent) => {
     const start = touchStartX.current;
     touchStartX.current = null;
     if (start == null || count <= 1) return;
@@ -186,119 +377,37 @@ export function HeroBleed({ brandName, slogan, lede, heroSrc, slides }: HeroBlee
     else manualPrev();
   };
 
-  const visualIndex = count > 0 ? ((index % count) + count) % count : 0;
-  const loopSlides =
-    count > 1 ? [slideList[count - 1], ...slideList, slideList[0]] : slideList;
-  const trackIndex = count > 1 ? index + 1 : 0;
+  const activeSlide = slideList[activeIndex] || slideList[0];
+  const outgoingSlide = outgoingIndex != null ? slideList[outgoingIndex] : null;
 
-  const renderSlideMedia = (slide: HeroSlide, key: string, priority: boolean) => {
-    const image = (
-      <Image
-        src={slide.imageUrl}
-        alt={slide.title || ''}
-        fill
-        priority={priority}
-        className="hero-media-img"
-        unoptimized={slide.imageUrl.startsWith('http')}
-        sizes="100vw"
-      />
-    );
-
-    if (!slide.linkUrl) {
-      return (
-        <div className="hero-slide" key={key}>
-          {image}
-        </div>
-      );
-    }
-
-    if (isExternalUrl(slide.linkUrl)) {
-      return (
-        <div className="hero-slide" key={key}>
-          <a className="hero-slide-link" href={slide.linkUrl} target="_blank" rel="noreferrer">
-            {image}
-          </a>
-        </div>
-      );
-    }
-
-    return (
-      <div className="hero-slide" key={key}>
-        <Link className="hero-slide-link" href={slide.linkUrl}>
-          {image}
-        </Link>
-      </div>
-    );
-  };
+  if (!activeSlide) {
+    return <section className="hero-bleed hero-bleed-empty" aria-hidden="true" />;
+  }
 
   return (
     <section
       className="hero-bleed"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
+      aria-roledescription="carousel"
+      aria-label="Hero banners"
     >
-      <div className="hero-media" ref={mediaRef} aria-hidden={count > 1 ? undefined : true}>
-        {count <= 1 ? (
-          renderSlideMedia(slideList[0] || { id: 'empty', imageUrl: heroSrc, linkUrl: '', title: '' }, 'solo', true)
-        ) : (
+      <div className="hero-media" ref={mediaRef}>
+        <div className="hero-stage">
           <div
-            ref={trackRef}
-            className={`hero-slider-track${animate ? ' is-animated' : ''}`}
-            style={{ transform: `translate3d(-${trackIndex * 100}%, 0, 0)` }}
+            className={`hero-layer is-base is-in-${incomingFx}`}
+            key={activeSlide.id}
           >
-            {loopSlides.map((slide, i) =>
-              renderSlideMedia(slide, `${slide.id}-${i}`, i === trackIndex)
-            )}
+            <SlideLink slide={activeSlide}>
+              <SlideImage slide={activeSlide} priority />
+            </SlideLink>
           </div>
-        )}
-      </div>
 
-      <div className="hero-veil" aria-hidden="true" />
-      <div className="hero-glow hero-glow-a" aria-hidden="true" />
-      <div className="hero-glow hero-glow-b" aria-hidden="true" />
-
-      {/* Feature: hero brand copy box — uncomment to re-enable
-      <div className="hero-inner">
-        <div className="hero-copy">
-          <p className="hero-kicker reveal-line">Natural wellness</p>
-
-          <h1 className="hero-brand-stack" aria-label={brandName}>
-            <span className="hero-brand-line reveal-line delay-brand-1">{primary}</span>
-            {secondary ? (
-              <span className="hero-brand-line hero-brand-accent reveal-line delay-brand-2">
-                {secondary}
-              </span>
-            ) : null}
-          </h1>
-
-          <span className="hero-rule reveal-rule" aria-hidden="true" />
-
-          <p className="hero-title reveal-fade">{slogan}</p>
-          <p className="hero-lede reveal-fade delay-lede">{lede}</p>
-
-          <div className="hero-cta reveal-fade delay-cta">
-            <Link className="button button-hero" href="/products">
-              <span>Shop products</span>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
-                <path
-                  d="M5 12h14M13 6l6 6-6 6"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </Link>
-            <Link className="hero-link" href="/packages">
-              View packages
-              <span aria-hidden="true">→</span>
-            </Link>
-          </div>
+          {outgoingSlide && phase === 'out' ? (
+            <FxOverlay key={`${outgoingSlide.id}-${activeFx}`} slide={outgoingSlide} fx={activeFx} />
+          ) : null}
         </div>
       </div>
-      */}
-
-      <NatureAmbient />
 
       {count > 1 ? (
         <>
@@ -341,10 +450,10 @@ export function HeroBleed({ brandName, slogan, lede, heroSrc, slides }: HeroBlee
                 key={slide.id}
                 type="button"
                 role="tab"
-                aria-selected={i === visualIndex}
-                className={`hero-slider-dot${i === visualIndex ? ' is-active' : ''}`}
+                aria-selected={i === activeIndex}
+                className={`hero-slider-dot${i === activeIndex ? ' is-active' : ''}`}
                 aria-label={`Go to slide ${i + 1}`}
-                onClick={() => goTo(i, true)}
+                onClick={() => goTo(i)}
               />
             ))}
           </div>

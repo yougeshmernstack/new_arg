@@ -42,4 +42,5 @@ export const commerceApi = {
   rejectOrderPayment: (payload) => api.post('/reject-order-payment', payload),
   downloadInvoice: (orderId) =>
     api.get('/download-invoice', { params: { orderId }, responseType: 'blob' }),
+  createGuestInvoice: (payload) => api.post('/create-guest-invoice', payload),
 };

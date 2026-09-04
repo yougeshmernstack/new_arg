@@ -10,6 +10,7 @@ const { nextPanelUid } = require('../../utils/panelIdentity');
 const { ensurePanelWallet } = require('../../utils/panelWallet');
 const { errorLogger } = require('../../utils/logger');
 const Email = require('../../SERVICES/SendEmail');
+const sms = require('../../SERVICES/SmsService');
 const { loginSuccess, registrationSuccess, REQUEST_SUCCESS } = require('../../utils/successMessages');
 const {
     INTERNAL_SERVER_ERROR,
@@ -101,6 +102,14 @@ class THEME_AUTH {
                     });
                 } catch (mailErr) {
                     errorLogger(mailErr);
+                }
+            }
+
+            if (savedUser.mobile) {
+                try {
+                    await sms.usernameSms(savedUser.mobile, savedUser.username, isStrongPassword.password);
+                } catch (smsErr) {
+                    errorLogger(smsErr);
                 }
             }
 
@@ -285,12 +294,17 @@ class ADMIN_THEME {
             const skip = (page - 1) * limit;
             const filter = {};
             if (req.query.search) {
+                const raw = String(req.query.search).trim();
                 filter.$or = [
-                    { name: { $regex: req.query.search, $options: 'i' } },
-                    { email: { $regex: req.query.search, $options: 'i' } },
-                    { username: { $regex: req.query.search, $options: 'i' } },
-                    { mobile: { $regex: req.query.search, $options: 'i' } }
+                    { name: { $regex: raw, $options: 'i' } },
+                    { email: { $regex: raw, $options: 'i' } },
+                    { username: { $regex: raw, $options: 'i' } },
+                    { mobile: { $regex: raw, $options: 'i' } }
                 ];
+                if (/^\d+$/.test(raw)) {
+                    const num = Number(raw);
+                    filter.$or.push({ themeUserId: num }, { uid: num });
+                }
             }
 
             const [list, total] = await Promise.all([

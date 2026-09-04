@@ -35,6 +35,11 @@ export default function CompanyBrand() {
       address: '',
       supportNote: '',
     },
+    invoiceTax: {
+      gst_number: '',
+      pan: '',
+      gst_percent: '',
+    },
     values: [emptyLabel()],
     pillars: [emptyLabel()],
     features: [emptyLabel()],
@@ -76,6 +81,14 @@ export default function CompanyBrand() {
           address: data.contact?.address || '',
           supportNote: data.contact?.supportNote || '',
         },
+        invoiceTax: {
+          gst_number: data.invoiceTax?.gst_number || '',
+          pan: data.invoiceTax?.pan || '',
+          gst_percent:
+            data.invoiceTax?.gst_percent === 0 || data.invoiceTax?.gst_percent
+              ? String(data.invoiceTax.gst_percent)
+              : '',
+        },
         values: data.values?.length ? data.values : [emptyLabel()],
         pillars: data.pillars?.length ? data.pillars : [emptyLabel()],
         features: data.features?.length ? data.features : [emptyLabel()],
@@ -97,6 +110,8 @@ export default function CompanyBrand() {
   const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
   const setContact = (key, value) =>
     setForm((prev) => ({ ...prev, contact: { ...prev.contact, [key]: value } }));
+  const setInvoiceTax = (key, value) =>
+    setForm((prev) => ({ ...prev, invoiceTax: { ...prev.invoiceTax, [key]: value } }));
 
   const uploadImage = async (field, file) => {
     if (!file) return;
@@ -121,7 +136,14 @@ export default function CompanyBrand() {
     setError('');
     setSuccess('');
     try {
-      await websiteApi.updateWebsiteContent(form);
+      await websiteApi.updateWebsiteContent({
+        ...form,
+        invoiceTax: {
+          gst_number: form.invoiceTax.gst_number || '',
+          pan: form.invoiceTax.pan || '',
+          gst_percent: Number(form.invoiceTax.gst_percent) || 0,
+        },
+      });
       setSuccess('Company / brand details saved.');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save');
@@ -239,6 +261,46 @@ export default function CompanyBrand() {
             ) : null}
           </label>
         </div>
+
+        <h3>Invoice / Tax</h3>
+        <p className="muted">
+          GSTIN yahan save karo — bina GSTIN ke invoice pe number nahi aayega. GST % bhi yahi se invoice pe lagti hai.
+        </p>
+        <div className="form-grid">
+          <label>
+            GSTIN <span style={{ color: '#b91c1c' }}>*</span>
+            <input
+              value={form.invoiceTax.gst_number}
+              onChange={(e) => setInvoiceTax('gst_number', e.target.value)}
+              placeholder="e.g. 02ABCDE1234F1Z5"
+            />
+            {!form.invoiceTax.gst_number ? (
+              <span className="muted" style={{ color: '#b91c1c' }}>
+                Required for tax invoices
+              </span>
+            ) : null}
+          </label>
+          <label>
+            PAN
+            <input
+              value={form.invoiceTax.pan}
+              onChange={(e) => setInvoiceTax('pan', e.target.value)}
+              placeholder="e.g. ABCDE1234F"
+            />
+          </label>
+          <label>
+            GST % (invoice)
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.invoiceTax.gst_percent}
+              onChange={(e) => setInvoiceTax('gst_percent', e.target.value)}
+              placeholder="e.g. 5 or 18"
+            />
+          </label>
+        </div>
+
         <p className="muted">
           Theme homepage background slider is managed under{' '}
           <Link to="/website/hero">Website → Hero Background</Link>

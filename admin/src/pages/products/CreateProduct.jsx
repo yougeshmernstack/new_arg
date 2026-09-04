@@ -14,6 +14,7 @@ const initial = {
   franchise_price: '',
   bv: '',
   gst: '',
+  hsn_code: '',
   stock: '',
   weight: '',
   status: 'enabled',
@@ -126,6 +127,10 @@ export default function CreateProduct() {
         <label>
           GST %
           <input name="gst" type="number" min="0" step="0.01" value={form.gst} onChange={onChange} />
+        </label>
+        <label>
+          HSN Code
+          <input name="hsn_code" value={form.hsn_code} onChange={onChange} placeholder="e.g. 2009" />
         </label>
         <label>
           Initial stock

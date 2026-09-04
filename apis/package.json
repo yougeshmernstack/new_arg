@@ -36,6 +36,7 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.14",
     "password-strength": "^0.0.1",
+    "puppeteer": "^24.43.1",
     "redis": "^4.6.15",
     "socket.io": "^4.7.5",
     "tronweb": "^6.0.0",

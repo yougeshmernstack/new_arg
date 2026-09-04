@@ -1,0 +1,34 @@
+<%#
+  Expects optional: logoUrl, logoCid, headerTitle (string)
+%>
+<%
+  const title = (typeof headerTitle !== 'undefined' && headerTitle) ? headerTitle : '';
+  const cid = (typeof logoCid !== 'undefined' && logoCid) ? String(logoCid) : '';
+  const url = (typeof logoUrl !== 'undefined' && logoUrl) ? String(logoUrl) : '';
+  const src = cid || url;
+%>
+<tr>
+  <td align="center" style="padding:32px 28px 24px;background:#ffffff;">
+    <% if (src) { %>
+    <img
+      src="<%= src %>"
+      width="200"
+      height="200"
+      alt="Arogya Green Life"
+      style="display:block;margin:0 auto;width:200px;max-width:200px;height:auto;border:0;outline:none;text-decoration:none;"
+    />
+    <% } else { %>
+    <p style="margin:0;font-size:24px;font-weight:700;color:#1b5e3b;letter-spacing:0.5px;">
+      Arogya Green Life
+    </p>
+    <% } %>
+    <% if (title) { %>
+    <p style="margin:16px 0 0;font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:#5f7a6a;">
+      <%= title %>
+    </p>
+    <% } %>
+  </td>
+</tr>
+<tr>
+  <td style="padding:0;height:3px;background:#1b5e3b;font-size:0;line-height:0;">&nbsp;</td>
+</tr>

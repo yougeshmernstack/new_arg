@@ -17,6 +17,10 @@ const ROLE_META = {
     title: 'Theme Orders',
     orderType: undefined,
   },
+  guest: {
+    title: 'Guest Invoices',
+    orderType: 'guest_purchase',
+  },
 };
 
 function formatOrderStatus(status) {
@@ -120,37 +124,48 @@ export default function Orders({ buyerRole = 'franchise' }) {
       <div className="page-head">
         <div>
           <h2>{meta.title}</h2>
-          <p className="page-sub">Track orders, invoices, buyer activity, and current fulfillment status.</p>
+          <p className="page-sub">
+            {buyerRole === 'guest'
+              ? 'Walk-in / guest bills created from admin — no username required. Share invoice number for public lookup.'
+              : 'Track orders, invoices, buyer activity, and current fulfillment status.'}
+          </p>
         </div>
-        <button
-          type="button"
-          className="btn"
-          disabled={loading || !list.length}
-          onClick={() =>
-            exportToExcel({
-              filename: `${buyerRole}_orders`,
-              sheetName: meta.title.slice(0, 31),
-              rows: list,
-              columns: [
-                { header: 'Order #', value: (r) => r.order_number || '' },
-                { header: 'Invoice #', value: (r) => r.invoice_number || '' },
-                { header: 'Package', value: (r) => r.package_name || '' },
-                { header: 'Buyer Name', value: (r) => r.buyer_name || '' },
-                { header: 'Buyer Username', value: (r) => r.buyer_username || '' },
-                { header: 'Buyer UID', value: (r) => r.buyer_uid ?? '' },
-                { header: 'Buyer Panel ID', value: (r) => r.buyer_panel_id ?? '' },
-                { header: 'Total', value: (r) => formatExcelAmount(r.grand_total) },
-                { header: 'BV', value: (r) => formatExcelAmount(r.bv) },
-                { header: 'Order Status', value: (r) => formatOrderStatus(r.order_status) },
-                { header: 'Payment Status', value: (r) => formatPaymentStatus(paymentStatusOf(r)) },
-                { header: 'UTR', value: (r) => r.payment?.utr || '' },
-                { header: 'Date', value: (r) => formatExcelDate(r.created_date) },
-              ],
-            })
-          }
-        >
-          Export Excel
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {buyerRole === 'guest' ? (
+            <Link className="btn" to="/orders/guest/create">
+              + Create guest invoice
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            className="btn"
+            disabled={loading || !list.length}
+            onClick={() =>
+              exportToExcel({
+                filename: `${buyerRole}_orders`,
+                sheetName: meta.title.slice(0, 31),
+                rows: list,
+                columns: [
+                  { header: 'Order #', value: (r) => r.order_number || '' },
+                  { header: 'Invoice #', value: (r) => r.invoice_number || '' },
+                  { header: 'Package', value: (r) => r.package_name || '' },
+                  { header: 'Buyer Name', value: (r) => r.buyer_name || '' },
+                  { header: 'Buyer Username', value: (r) => r.buyer_username || '' },
+                  { header: 'Buyer UID', value: (r) => r.buyer_uid ?? '' },
+                  { header: 'Buyer Panel ID', value: (r) => r.buyer_panel_id ?? '' },
+                  { header: 'Total', value: (r) => formatExcelAmount(r.grand_total) },
+                  { header: 'BV', value: (r) => formatExcelAmount(r.bv) },
+                  { header: 'Order Status', value: (r) => formatOrderStatus(r.order_status) },
+                  { header: 'Payment Status', value: (r) => formatPaymentStatus(paymentStatusOf(r)) },
+                  { header: 'UTR', value: (r) => r.payment?.utr || '' },
+                  { header: 'Date', value: (r) => formatExcelDate(r.created_date) },
+                ],
+              })
+            }
+          >
+            Export Excel
+          </button>
+        </div>
       </div>
       <form
         className="toolbar orders-toolbar"

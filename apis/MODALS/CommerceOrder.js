@@ -18,6 +18,7 @@ const orderItemSchema = new mongoose.Schema({
     productId: { type: Number, required: true },
     sku: { type: String, required: true },
     product_name: { type: String, required: true },
+    hsn_code: { type: String, default: '' },
     quantity: { type: Number, required: true, min: 1 },
     price: { type: Number, required: true },
     gst: { type: Number, default: 0 },
@@ -64,21 +65,22 @@ const commerceOrderSchema = new mongoose.Schema({
     order_number: { type: String, unique: true },
     invoice_number: { type: String, unique: true, sparse: true },
     idempotency_key: { type: String, unique: true, sparse: true },
-    // franchise_purchase | distributor_purchase | theme_purchase | distributor_package_purchase
+    // franchise_purchase | distributor_purchase | theme_purchase | distributor_package_purchase | guest_purchase
     order_type: {
         type: String,
         enum: [
             'franchise_purchase',
             'distributor_purchase',
             'theme_purchase',
-            'distributor_package_purchase'
+            'distributor_package_purchase',
+            'guest_purchase'
         ],
         required: true
     },
     buyer_uid: { type: Number, required: true },
     buyer_role: {
         type: String,
-        enum: ['franchise', 'distributor', 'theme'],
+        enum: ['franchise', 'distributor', 'theme', 'guest'],
         required: true
     },
     franchiseId: { type: Number, default: null },
@@ -123,6 +125,16 @@ const commerceOrderSchema = new mongoose.Schema({
     timeline: { type: [timelineSchema], default: [] },
     shipping: { type: shippingSchema, default: () => ({}) },
     shipping_address: {
+        name: { type: String, default: '' },
+        mobile: { type: String, default: '' },
+        line1: { type: String, default: '' },
+        line2: { type: String, default: '' },
+        city: { type: String, default: '' },
+        state: { type: String, default: '' },
+        pincode: { type: String, default: '' },
+        country: { type: String, default: 'India' }
+    },
+    billing_address: {
         name: { type: String, default: '' },
         mobile: { type: String, default: '' },
         line1: { type: String, default: '' },

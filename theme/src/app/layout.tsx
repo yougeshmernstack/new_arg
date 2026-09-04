@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Fraunces, Manrope } from "next/font/google";
+import { Suspense } from "react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { ScrollToTop } from "@/components/ScrollToTop";
+import { ThemeAuthBootstrap } from "@/components/ThemeAuthBootstrap";
 import { brand } from "@/data/brand";
 import "./globals.css";
 
@@ -61,6 +64,10 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <ScrollToTop />
+        <Suspense fallback={null}>
+          <ThemeAuthBootstrap />
+        </Suspense>
         <Header />
         <main>{children}</main>
         <Footer />
