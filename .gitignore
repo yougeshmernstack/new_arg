@@ -3,15 +3,7 @@ node_modules/
 
 # Next.js / build outputs
 .next/
-out/
-build/
-dist/
 
-# Env / secrets
-.env
-.env.local
-.env.*.local
-!.env.example
 
 # Logs / OS
 npm-debug.log*
